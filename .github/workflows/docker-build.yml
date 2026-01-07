@@ -1,0 +1,82 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - '**/*.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker-build.yml'
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: [self-hosted, octacer_info]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine image name and suffix
+        id: image-info
+        run: |
+          # Lowercase the repository name for Docker
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=${REPO_LOWER}" >> $GITHUB_OUTPUT
+
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "suffix=prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "dev" ]]; then
+            echo "suffix=dev" >> $GITHUB_OUTPUT
+          else
+            echo "suffix=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.image-info.outputs.repo }}-${{ steps.image-info.outputs.suffix }}
+          tags: |
+            type=sha,prefix=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.image-info.outputs.repo }}-${{ steps.image-info.outputs.suffix }}:latest
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trigger production deployment
+        if: github.ref_name == 'main'
+        run: |
+          echo "Triggering production deployment for cloud-sekureid..."
+          curl -s -X GET "https://automation.octacer.info/webhook/prod-vm-deploy?project=cloud-sekureid" &
+          echo "Deployment webhook triggered (async)"

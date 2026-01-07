@@ -304,15 +304,19 @@ Chrome runs with `--headless=new` flag which is the latest and most stable headl
 
 ```
 cloud_sekureid/
-├── sekureid_automation.py  # Core Selenium automation script
-├── api_server.py           # FastAPI REST API wrapper
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Docker container configuration
-├── docker-compose.yml      # Docker Compose configuration
-├── .dockerignore           # Docker ignore file
-├── README.md              # This file
-├── downloads/             # Default download directory (created automatically)
-└── temp_reports/          # Temporary files for API (created automatically)
+├── .github/
+│   └── workflows/
+│       └── docker-build.yml    # GitHub Actions CI/CD workflow
+├── sekureid_automation.py      # Core Selenium automation script
+├── api_server.py               # FastAPI REST API wrapper
+├── requirements.txt            # Python dependencies
+├── Dockerfile                  # Docker container configuration
+├── docker-compose.yml          # Docker Compose configuration
+├── .dockerignore               # Docker ignore file
+├── .gitignore                  # Git ignore file
+├── README.md                   # This file
+├── downloads/                  # Default download directory (created automatically)
+└── temp_reports/               # Temporary files for API (created automatically)
 ```
 
 ## Troubleshooting
@@ -393,6 +397,63 @@ If you get an error about ChromeDriver version:
 - Use HTTPS in production
 - Implement authentication for the API endpoint
 - Rate limit the API to prevent abuse
+
+## CI/CD Pipeline (GitHub Actions)
+
+This project includes automated CI/CD using GitHub Actions. The workflow automatically:
+
+1. **Builds Docker images** when you push to `main` or `dev` branches
+2. **Pushes to GitHub Container Registry** (ghcr.io)
+3. **Tags images appropriately**:
+   - `main` branch → `project-prod:latest`
+   - `dev` branch → `project-dev:latest`
+4. **Triggers deployment webhook** for production (main branch only)
+
+### Workflow Triggers
+
+The GitHub Actions workflow runs when:
+- Push to `main` or `dev` branches
+- Changes to Python files (`**/*.py`)
+- Changes to `requirements.txt`, `Dockerfile`, or `docker-compose.yml`
+- Version tags (e.g., `v1.0.0`)
+
+### Using Published Images
+
+After the workflow runs, you can pull and use the published images:
+
+```bash
+# Pull the production image
+docker pull ghcr.io/octacer/cloud-sekureid-prod:latest
+
+# Run it
+docker run -d \
+  -p 8000:8000 \
+  --shm-size=2g \
+  ghcr.io/octacer/cloud-sekureid-prod:latest
+```
+
+### Setting Up CI/CD
+
+To use the GitHub Actions workflow:
+
+1. **Enable GitHub Actions** in your repository settings
+2. **Configure self-hosted runner** (if using `[self-hosted, octacer_info]`)
+   - Or change to `runs-on: ubuntu-latest` for GitHub-hosted runners
+3. **Grant permissions**:
+   - Go to Settings → Actions → General
+   - Enable "Read and write permissions" for GITHUB_TOKEN
+4. **Push your code** to `main` or `dev` branch
+
+The workflow will automatically build and publish Docker images to GitHub Container Registry.
+
+### Deployment Webhook
+
+The workflow triggers an automatic deployment webhook for production:
+```bash
+curl -s -X GET "https://automation.octacer.info/webhook/prod-vm-deploy?project=cloud-sekureid"
+```
+
+This webhook should pull the latest image and restart the service on your production server.
 
 ## Production Deployment
 
