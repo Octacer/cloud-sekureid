@@ -199,17 +199,21 @@ class SekureIDAutomation:
         time.sleep(5)
         print(f"→ Current URL after wait: {self.driver.current_url}\n")
 
-        # Take screenshot for debugging
+        # Take screenshot for debugging with timestamp
         try:
-            screenshot_path = os.path.join(self.download_dir, "debug_screenshot.png")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_filename = f"{timestamp}_debug_screenshot.png"
+            screenshot_path = os.path.join(self.download_dir, screenshot_filename)
             self.driver.save_screenshot(screenshot_path)
             print(f"→ Screenshot saved to: {screenshot_path}")
         except Exception as e:
             print(f"→ Could not save screenshot: {e}")
 
-        # Get page source for debugging
+        # Get page source for debugging with timestamp
         try:
-            page_source_path = os.path.join(self.download_dir, "page_source.html")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            page_source_filename = f"{timestamp}_page_source.html"
+            page_source_path = os.path.join(self.download_dir, page_source_filename)
             with open(page_source_path, "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
             print(f"→ Page source saved to: {page_source_path}\n")
@@ -416,14 +420,16 @@ class SekureIDAutomation:
         except Exception as e:
             print(f"Error during automation: {e}")
 
-            # Save error screenshot and page source for debugging
+            # Save error screenshot and page source for debugging with timestamp
             try:
                 if self.driver:
-                    error_screenshot = os.path.join(self.download_dir, "error_screenshot.png")
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+                    error_screenshot = os.path.join(self.download_dir, f"{timestamp}_error_screenshot.png")
                     self.driver.save_screenshot(error_screenshot)
                     print(f"Error screenshot saved to: {error_screenshot}")
 
-                    error_page_source = os.path.join(self.download_dir, "error_page_source.html")
+                    error_page_source = os.path.join(self.download_dir, f"{timestamp}_error_page_source.html")
                     with open(error_page_source, "w", encoding="utf-8") as f:
                         f.write(self.driver.page_source)
                     print(f"Error page source saved to: {error_page_source}")

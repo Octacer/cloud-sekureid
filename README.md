@@ -404,18 +404,117 @@ When an error occurs, the API returns debug information:
   "error": "Could not find or click Excel export button",
   "message": "Failed to generate report",
   "debug": {
-    "debug_screenshot": "https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png",
-    "debug_page_source": "https://sekureid.octacer.info/files/debug_abc-123/error_page_source.html",
-    "debug_id": "abc-123"
+    "debug_id": "abc-123-def-456",
+    "debug_files": [
+      {
+        "name": "error_screenshot.png",
+        "url": "https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png",
+        "type": "image"
+      },
+      {
+        "name": "error_page_source.html",
+        "url": "https://sekureid.octacer.info/files/debug_abc-123/error_page_source.html",
+        "type": "html"
+      },
+      {
+        "name": "page_source.html",
+        "url": "https://sekureid.octacer.info/files/debug_abc-123/page_source.html",
+        "type": "html"
+      }
+    ],
+    "view_all_url": "https://sekureid.octacer.info/debug/abc-123"
   }
 }
 ```
 
-**2. Access Debug Files**
+**2. Access Debug Files (Multiple Ways)**
 
-Open the URLs in your browser to see what went wrong:
-- **Screenshot**: Visual snapshot of the browser at the moment of error
-- **Page Source**: Complete HTML of the page for inspection
+**Option A: Direct Download URLs (Easiest!)**
+
+Just click/curl the URLs from the error response:
+```bash
+# Download screenshot
+curl https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png --output error.png
+
+# Download page source
+curl https://sekureid.octacer.info/files/debug_abc-123/error_page_source.html --output error.html
+
+# Or just open in browser:
+open https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png
+```
+
+**Option B: List All Debug Files via API**
+
+```bash
+# Get all files for a debug session
+curl https://sekureid.octacer.info/debug/abc-123
+
+# Response with FULL URLs:
+# {
+#   "debug_id": "abc-123",
+#   "files": [
+#     {
+#       "name": "20260107_103045_error_screenshot.png",
+#       "url": "https://sekureid.octacer.info/files/debug_abc-123/20260107_103045_error_screenshot.png",
+#       "type": "image"
+#     },
+#     {
+#       "name": "20260107_103045_error_page_source.html",
+#       "url": "https://sekureid.octacer.info/files/debug_abc-123/20260107_103045_error_page_source.html",
+#       "type": "html"
+#     }
+#   ],
+#   "total_files": 2
+# }
+```
+
+**Note**: Files now have timestamp prefixes (`YYYYMMDD_HHMMSS_`) for easy sorting!
+
+**Option C: List ALL Debug Sessions**
+
+```bash
+# See all available debug sessions
+curl https://sekureid.octacer.info/debug
+
+# Response:
+# {
+#   "total_sessions": 5,
+#   "sessions": [
+#     {
+#       "debug_id": "abc-123",
+#       "created_at": "2026-01-07T10:30:00",
+#       "file_count": 3,
+#       "view_url": "/debug/abc-123"
+#     },
+#     ...
+#   ]
+# }
+```
+
+**Option D: Access via Volume Mount (You Already Have This!)**
+
+Since your docker-compose has volume mounts:
+```yaml
+volumes:
+  - ./sekureId_downloads:/home/appuser/downloads
+```
+
+Debug files are automatically available at:
+```bash
+# On your server
+cd /var/www/projects/cloud-sekureid/sekureId_downloads
+
+# List debug folders
+ls -lah debug_*/
+
+# View screenshot
+cd debug_abc-123/
+ls -lah
+# You'll see: error_screenshot.png, error_page_source.html, page_source.html
+
+# Download to your local machine via SCP
+scp ubuntu@your-server:/var/www/projects/cloud-sekureid/sekureId_downloads/debug_abc-123/error_screenshot.png ./
+```
 
 **3. Debug Logs in Docker**
 
@@ -469,6 +568,41 @@ find /home/appuser/downloads -name "*.png" -o -name "*.html"
 
 # Check Chrome is working
 chromium --version
+```
+
+**7. View Screenshots from Container**
+
+Multiple ways to access debug screenshots:
+
+```bash
+# Method 1: Copy screenshot to your machine
+docker cp sekureid-report-generator:/home/appuser/downloads/debug_abc-123/error_screenshot.png ./
+
+# Method 2: Copy entire debug directory
+docker cp sekureid-report-generator:/home/appuser/downloads/debug_abc-123 ./
+
+# Method 3: Copy latest screenshot (one-liner)
+docker exec sekureid-report-generator sh -c 'ls -t /home/appuser/downloads/debug_*/error_screenshot.png | head -1' | xargs -I {} docker cp sekureid-report-generator:{} ./latest_error.png
+
+# Method 4: Mount volume for direct access (add to docker-compose.yml)
+# volumes:
+#   - ./downloads:/home/appuser/downloads
+
+# Method 5: Use debug URLs from API error response (easiest!)
+# Open the URL in browser: https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png
+```
+
+**8. Find Latest Debug Files**
+
+```bash
+# Enter container and find recent files
+docker exec -it sekureid-report-generator /bin/bash
+
+# Find screenshots from last hour
+find /home/appuser/downloads -name "*.png" -mmin -60
+
+# List newest files first
+ls -lt /home/appuser/downloads/debug_*/
 ```
 
 ## Troubleshooting

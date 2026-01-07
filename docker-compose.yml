@@ -1,23 +1,25 @@
 version: '3.8'
 
 services:
-  sekureid-api:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: sekureid-report-generator
+    container_name: cloud-sekureid
     ports:
-      - "8000:8000"
+      - "3003:8000"
     environment:
       # Optional: Override default credentials via environment variables
       - SEKUREID_COMPANY_CODE=85
       - SEKUREID_USERNAME=hisham.octacer
       - SEKUREID_PASSWORD=P@ss1234
+      # Base domain for generating debug file URLs (default: http://localhost:8000)
+      - BASE_DOMAIN=https://sekureid.octacer.info
     volumes:
       # Optional: Mount a volume for downloaded reports (if you want to keep them)
-      - ./downloads:/home/appuser/downloads
+      - ./sekureId_downloads:/home/appuser/downloads
       # Optional: Mount logs
-      - ./logs:/home/appuser/logs
+      - ./sekureId_logs:/home/appuser/logs
     restart: unless-stopped
     # Resource limits (adjust as needed)
     deploy:

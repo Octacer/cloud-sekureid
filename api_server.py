@@ -15,6 +15,9 @@ import uuid
 import asyncio
 from sekureid_automation import SekureIDAutomation
 
+# Get base URL from environment variable
+BASE_DOMAIN = os.getenv("BASE_DOMAIN", "http://localhost:8000")
+
 
 app = FastAPI(
     title="Sekure-ID Report Generator API",
@@ -77,6 +80,8 @@ async def root():
             "GET /get-report-default": "Generate today's report with defaults (JSON with URL)",
             "GET /get-report-default-direct": "Generate and directly download today's report",
             "GET /download/{file_id}": "Download a generated report by file ID",
+            "GET /debug": "List all debug sessions (when errors occur)",
+            "GET /debug/{debug_id}": "Get debug files for a specific debug session",
             "GET /health": "Health check endpoint"
         }
     }
@@ -206,29 +211,46 @@ def _generate_report_internal(
         # Check for debug files before cleanup
         debug_info = {}
         try:
-            debug_screenshot = os.path.join(download_dir, "error_screenshot.png")
-            debug_page_source = os.path.join(download_dir, "error_page_source.html")
-            page_source_file = os.path.join(download_dir, "page_source.html")
+            # Look for debug files (with timestamp patterns)
+            debug_files_found = []
+            if os.path.exists(download_dir):
+                for filename in os.listdir(download_dir):
+                    if filename.endswith('.png') or filename.endswith('.html'):
+                        if 'screenshot' in filename or 'page_source' in filename:
+                            debug_files_found.append(os.path.join(download_dir, filename))
 
             # Check if debug files exist
-            if os.path.exists(debug_screenshot):
+            if debug_files_found:
                 # Save debug files to a persistent location
                 debug_id = str(uuid.uuid4())
                 debug_dir = os.path.join(DOWNLOADS_DIR, f"debug_{debug_id}")
                 os.makedirs(debug_dir, exist_ok=True)
 
-                if os.path.exists(debug_screenshot):
-                    shutil.copy(debug_screenshot, os.path.join(debug_dir, "error_screenshot.png"))
-                if os.path.exists(debug_page_source):
-                    shutil.copy(debug_page_source, os.path.join(debug_dir, "error_page_source.html"))
-                if os.path.exists(page_source_file):
-                    shutil.copy(page_source_file, os.path.join(debug_dir, "page_source.html"))
+                debug_files = []
 
-                base_url = str(request.base_url).rstrip('/')
+                for filepath in debug_files_found:
+                    filename = os.path.basename(filepath)
+                    dest_path = os.path.join(debug_dir, filename)
+                    shutil.copy(filepath, dest_path)
+
+                    file_type = "image" if filename.endswith('.png') else "html"
+                    debug_files.append({
+                        "name": filename,
+                        "url": f"{BASE_DOMAIN}/files/debug_{debug_id}/{filename}",
+                        "type": file_type
+                    })
+
+                # Find screenshot and page source for legacy fields
+                screenshot_file = next((f for f in debug_files if 'screenshot' in f['name'] and f['type'] == 'image'), None)
+                page_source_file = next((f for f in debug_files if 'page_source' in f['name'] and f['type'] == 'html'), None)
+
                 debug_info = {
-                    "debug_screenshot": f"{base_url}/files/debug_{debug_id}/error_screenshot.png",
-                    "debug_page_source": f"{base_url}/files/debug_{debug_id}/error_page_source.html",
-                    "debug_id": debug_id
+                    "debug_id": debug_id,
+                    "debug_files": debug_files,
+                    "view_all_url": f"{BASE_DOMAIN}/debug/{debug_id}",
+                    # Legacy fields for backwards compatibility
+                    "debug_screenshot": screenshot_file['url'] if screenshot_file else None,
+                    "debug_page_source": page_source_file['url'] if page_source_file else None
                 }
                 print(f"Debug files saved. Debug ID: {debug_id}")
         except Exception as debug_error:
@@ -356,6 +378,102 @@ async def get_report_default_direct(
         request=request,
         return_json=False
     )
+
+
+@app.get("/debug/{debug_id}")
+async def get_debug_info(debug_id: str):
+    """
+    Get debug information and list of debug files for a specific debug ID
+
+    Parameters:
+    - debug_id: The debug ID returned in error response
+
+    Returns:
+    - JSON with list of available debug files and download URLs
+    """
+    debug_dir = os.path.join(DOWNLOADS_DIR, f"debug_{debug_id}")
+
+    if not os.path.exists(debug_dir):
+        raise HTTPException(
+            status_code=404,
+            detail="Debug session not found or has expired"
+        )
+
+    # List all files in debug directory
+    debug_files = []
+    base_url = str(Request).split("'")[1] if "'" in str(Request) else "http://localhost:8000"
+
+    try:
+        for filename in os.listdir(debug_dir):
+            filepath = os.path.join(debug_dir, filename)
+            if os.path.isfile(filepath):
+                file_size = os.path.getsize(filepath)
+                file_type = "image" if filename.endswith(".png") else "html"
+
+                debug_files.append({
+                    "name": filename,
+                    "url": f"/files/debug_{debug_id}/{filename}",
+                    "type": file_type,
+                    "size": file_size
+                })
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error reading debug files: {str(e)}"
+        )
+
+    return {
+        "debug_id": debug_id,
+        "files": debug_files,
+        "total_files": len(debug_files),
+        "message": "Use the URLs to download individual files"
+    }
+
+
+@app.get("/debug")
+async def list_debug_sessions():
+    """
+    List all available debug sessions
+
+    Returns:
+    - JSON with list of all debug sessions available
+    """
+    debug_sessions = []
+
+    try:
+        for item in os.listdir(DOWNLOADS_DIR):
+            if item.startswith("debug_") and os.path.isdir(os.path.join(DOWNLOADS_DIR, item)):
+                debug_id = item.replace("debug_", "")
+                debug_dir = os.path.join(DOWNLOADS_DIR, item)
+
+                # Get directory stats
+                stat = os.stat(debug_dir)
+                created_time = datetime.fromtimestamp(stat.st_ctime)
+
+                # Count files
+                file_count = len([f for f in os.listdir(debug_dir) if os.path.isfile(os.path.join(debug_dir, f))])
+
+                debug_sessions.append({
+                    "debug_id": debug_id,
+                    "created_at": created_time.isoformat(),
+                    "file_count": file_count,
+                    "view_url": f"/debug/{debug_id}"
+                })
+
+        # Sort by created time (newest first)
+        debug_sessions.sort(key=lambda x: x["created_at"], reverse=True)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing debug sessions: {str(e)}"
+        )
+
+    return {
+        "total_sessions": len(debug_sessions),
+        "sessions": debug_sessions,
+        "message": "Use view_url to see files for each session"
+    }
 
 
 @app.get("/download/{file_id}")

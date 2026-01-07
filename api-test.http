@@ -214,6 +214,32 @@ Content-Type: application/json
 GET {{workflowUrl}}
 
 ###############################################################################
+# Debug Endpoints (When Errors Occur)
+###############################################################################
+
+### List all debug sessions
+GET {{baseUrl}}/debug
+Accept: application/json
+
+###
+
+### Get debug files for a specific session
+# Replace with actual debug_id from error response
+GET {{baseUrl}}/debug/abc-123-def-456
+Accept: application/json
+
+###
+
+### Download screenshot directly
+# Replace with actual debug_id
+GET {{baseUrl}}/files/debug_abc-123-def-456/error_screenshot.png
+
+###
+
+### Download page source
+GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
+
+###############################################################################
 # Notes & Documentation
 ###############################################################################
 
