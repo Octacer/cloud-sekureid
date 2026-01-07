@@ -163,9 +163,47 @@ Interactive API documentation: `http://localhost:8000/docs`
 
 ## API Endpoints
 
+The API now offers **two modes** for each endpoint:
+
+1. **JSON Response** (NEW - Recommended): Returns JSON with a download URL
+2. **Direct Download** (Backwards Compatible): Returns Excel file directly
+
+### GET /get-report-default
+
+**Quick and easy!** Generate today's attendance report with default credentials - Returns JSON with download URL.
+
+**Example:**
+```bash
+curl http://localhost:8000/get-report-default
+```
+
+**Response:**
+```json
+{
+  "report_url": "https://sekureid.octacer.info/download/abc-123-def-456",
+  "file_id": "abc-123-def-456",
+  "report_date": "2024-01-15",
+  "generated_at": "2024-01-15T10:30:00",
+  "expires_in": 3600
+}
+```
+
+Then download using the URL:
+```bash
+curl https://sekureid.octacer.info/download/abc-123-def-456 --output report.xlsx
+```
+
+### GET /get-report-default-direct
+
+Same as above but returns Excel file directly (backwards compatible).
+
+```bash
+curl http://localhost:8000/get-report-default-direct --output report.xlsx
+```
+
 ### POST /generate-report
 
-Generate and download attendance report.
+Generate attendance report with custom parameters - Returns JSON with download URL.
 
 **Request Body:**
 ```json
@@ -188,6 +226,18 @@ All fields are optional. Default values:
 - Error: JSON with error details
 
 ### Example API Calls
+
+**Using the GET endpoint (simplest):**
+```bash
+# Download today's report with default credentials
+curl http://localhost:8000/get-report-default --output report.xlsx
+
+# Or use wget
+wget http://localhost:8000/get-report-default -O report.xlsx
+
+# Works in browser too - just visit:
+# http://localhost:8000/get-report-default
+```
 
 **Using curl:**
 ```bash
@@ -309,6 +359,7 @@ cloud_sekureid/
 │       └── docker-build.yml    # GitHub Actions CI/CD workflow
 ├── sekureid_automation.py      # Core Selenium automation script
 ├── api_server.py               # FastAPI REST API wrapper
+├── api-test.http               # HTTP test file for VS Code REST Client
 ├── requirements.txt            # Python dependencies
 ├── Dockerfile                  # Docker container configuration
 ├── docker-compose.yml          # Docker Compose configuration
@@ -318,6 +369,26 @@ cloud_sekureid/
 ├── downloads/                  # Default download directory (created automatically)
 └── temp_reports/               # Temporary files for API (created automatically)
 ```
+
+## Testing the API
+
+### Using the .http File
+
+The project includes an `api-test.http` file for easy API testing. You can use it with:
+- **VS Code**: Install the [REST Client extension](https://marketplace.visualstudio.com/items?itemName=humao.rest-client)
+- **IntelliJ IDEA / WebStorm**: Built-in HTTP Client
+
+**Quick Start:**
+1. Open `api-test.http` in your IDE
+2. Change the `@baseUrl` variable if needed (default: `https://sekureid.octacer.info`)
+3. Click "Send Request" above any request
+
+The file includes:
+- Health check tests
+- GET endpoint for quick daily reports
+- POST endpoint with various parameter combinations
+- Error testing scenarios
+- Helpful comments and examples
 
 ## Troubleshooting
 

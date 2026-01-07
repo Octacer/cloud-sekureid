@@ -1,0 +1,254 @@
+### Sekure-ID Report Generator API - Testing File
+### Use with VS Code REST Client extension or IntelliJ HTTP Client
+### Change the @baseUrl variable to your server URL
+
+@baseUrl = https://sekureid.octacer.info
+
+###############################################################################
+# Health Check
+###############################################################################
+
+### Health Check - Verify API is running
+GET {{baseUrl}}/health
+Accept: application/json
+
+###############################################################################
+# Root Endpoint
+###############################################################################
+
+### Get API Information
+GET {{baseUrl}}/
+Accept: application/json
+
+###############################################################################
+# GET Report with Default Credentials (JSON Response)
+###############################################################################
+
+### Get Today's Report (Default Credentials) - Returns JSON with download URL
+# @name getTodayReportJSON
+GET {{baseUrl}}/get-report-default
+Accept: application/json
+
+###
+
+### Extract and Use the Download URL from previous response
+@downloadUrl = {{getTodayReportJSON.response.body.report_url}}
+@fileId = {{getTodayReportJSON.response.body.file_id}}
+
+### Download the file using the URL from JSON response
+GET {{downloadUrl}}
+
+###
+
+### Alternative: Download using file_id
+GET {{baseUrl}}/download/{{fileId}}
+
+###############################################################################
+# GET Report - Direct Download (Backwards Compatible)
+###############################################################################
+
+### Get Today's Report (Default) - Direct Excel Download
+GET {{baseUrl}}/get-report-default-direct
+
+###############################################################################
+# POST Report with Custom Parameters (JSON Response)
+###############################################################################
+
+### Generate Report - Returns JSON with download URL
+# @name generateReportJSON
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234"
+}
+
+###
+
+### Download using the URL from previous generate-report response
+@generateDownloadUrl = {{generateReportJSON.response.body.report_url}}
+
+GET {{generateDownloadUrl}}
+
+###
+
+### Generate Report - Specific Date (JSON Response)
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-15"
+}
+
+###
+
+### Generate Report - All Defaults (Minimal Request - JSON Response)
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{}
+
+###############################################################################
+# POST Report - Direct Download (Backwards Compatible)
+###############################################################################
+
+### Generate Report - Direct Excel Download
+POST {{baseUrl}}/generate-report-direct
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234"
+}
+
+###
+
+### Generate Report - Specific Date - Direct Download
+POST {{baseUrl}}/generate-report-direct
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-15"
+}
+
+###############################################################################
+# Download by File ID
+###############################################################################
+
+### Download file using file_id
+# Replace with actual file_id from generate-report response
+GET {{baseUrl}}/download/12345678-1234-1234-1234-123456789abc
+
+###############################################################################
+# Testing with Different Dates
+###############################################################################
+
+### Generate Report - Yesterday (JSON)
+# Change the date to yesterday's date
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-06"
+}
+
+###
+
+### Generate Report - Last Week (JSON)
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-01"
+}
+
+###############################################################################
+# Error Testing
+###############################################################################
+
+### Test Invalid Date Format (Should Return 400)
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "01/15/2024"
+}
+
+###
+
+### Test Download with Invalid File ID (Should Return 404)
+GET {{baseUrl}}/download/invalid-file-id-123
+
+###
+
+### Test Invalid Credentials (Should Return 500 or Auth Error)
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "99",
+  "username": "invalid.user",
+  "password": "WrongPassword",
+  "report_date": "2024-01-15"
+}
+
+###############################################################################
+# Example Workflow: Generate → Get URL → Download
+###############################################################################
+
+### Step 1: Generate report and get JSON response with download URL
+# @name workflowStep1
+POST {{baseUrl}}/generate-report
+Content-Type: application/json
+
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-15"
+}
+
+###
+
+### Step 2: Use the report_url from Step 1 to download the file
+@workflowUrl = {{workflowStep1.response.body.report_url}}
+
+GET {{workflowUrl}}
+
+###############################################################################
+# Notes & Documentation
+###############################################################################
+
+# API Endpoints:
+#
+# 1. JSON Response Endpoints (NEW - Recommended):
+#    - GET  /get-report-default          → Returns JSON with download URL
+#    - POST /generate-report             → Returns JSON with download URL
+#    - GET  /download/{file_id}          → Download file by ID
+#
+# 2. Direct Download Endpoints (Backwards Compatible):
+#    - GET  /get-report-default-direct   → Direct Excel download
+#    - POST /generate-report-direct      → Direct Excel download
+#
+# JSON Response Format:
+# {
+#   "report_url": "https://sekureid.octacer.info/download/uuid",
+#   "file_id": "uuid",
+#   "report_date": "2024-01-15",
+#   "generated_at": "2024-01-15T10:30:00",
+#   "expires_in": 3600
+# }
+#
+# Tips:
+# - JSON endpoints return URLs valid for 1 hour
+# - Direct endpoints return Excel file immediately
+# - All POST parameters are optional
+# - Date format must be YYYY-MM-DD
+# - Files auto-cleanup after 1 hour
+#
+# Variable Usage:
+# - Change @baseUrl for different environments
+# - Extract response data using {{requestName.response.body.field}}
+#
+# Common URLs:
+# - Local: http://localhost:8000
+# - Production: https://sekureid.octacer.info
+# - Development: https://dev.sekureid.octacer.info
