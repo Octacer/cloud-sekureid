@@ -59,8 +59,9 @@ class SekureIDAutomation:
 
     def login(self, company_code="85", username="hisham.octacer", password="P@ss1234"):
         """Login to the Sekure-ID portal"""
-        print("Navigating to login page...")
+        print("\nNavigating to login page...")
         self.driver.get("https://cloud.sekure-id.com/")
+        print(f"→ Current URL: {self.driver.current_url}\n")
 
         # Wait for the form to be present
         wait = WebDriverWait(self.driver, 10)
@@ -72,16 +73,19 @@ class SekureIDAutomation:
         )
         company_code_field.clear()
         company_code_field.send_keys(company_code)
+        print(f"→ Entered company code: {company_code}")
 
         # Fill in username
         username_field = self.driver.find_element(By.ID, "Username")
         username_field.clear()
         username_field.send_keys(username)
+        print(f"→ Entered username: {username}")
 
         # Fill in password
         password_field = self.driver.find_element(By.ID, "pass")
         password_field.clear()
         password_field.send_keys(password)
+        print(f"→ Entered password: ****\n")
 
         # Submit the form
         print("Submitting login form...")
@@ -90,13 +94,17 @@ class SekureIDAutomation:
 
         # Wait for navigation after login
         time.sleep(3)
-        print("Login successful!")
+        print(f"Login successful!")
+        print(f"→ Current URL: {self.driver.current_url}")
+        print(f"→ Page title: {self.driver.title}\n")
 
     def navigate_to_reports(self):
         """Navigate to Daily Reports page"""
         print("Navigating to Daily Reports...")
         self.driver.get("https://cloud.sekure-id.com/DailyReports")
+        print(f"→ Current URL: {self.driver.current_url}")
         time.sleep(2)
+        print(f"→ Page title: {self.driver.title}\n")
 
     def submit_report_form(self, report_date=None):
         """Submit the daily report form
@@ -111,11 +119,14 @@ class SekureIDAutomation:
             report_date = datetime.now().strftime("%Y-%m-%d")
 
         print(f"Setting report date to: {report_date}")
+        print(f"→ Current URL: {self.driver.current_url}\n")
+
         date_field = wait.until(
             EC.presence_of_element_located((By.ID, "Date"))
         )
         date_field.clear()
         date_field.send_keys(report_date)
+        print(f"→ Date field filled with: {report_date}\n")
 
         # The form has default values selected for Company Name (Octacer, My Construction)
         # and the default report type is "Daily Attendance"
@@ -126,75 +137,146 @@ class SekureIDAutomation:
 
         # Find and click the View Report button
         print("Clicking View Report button...")
+        print(f"→ Current URL before click: {self.driver.current_url}")
+
         # The button might be found by text or by searching for submit buttons
+        button_clicked = False
         try:
             # Try to find by button text
             view_report_buttons = self.driver.find_elements(By.TAG_NAME, "button")
+            print(f"→ Found {len(view_report_buttons)} buttons on page")
             for button in view_report_buttons:
-                if "View" in button.text or "Report" in button.text:
+                button_text = button.text.strip()
+                if "View" in button_text or "Report" in button_text:
+                    print(f"→ Clicking button with text: '{button_text}'\n")
                     button.click()
+                    button_clicked = True
                     break
         except Exception as e:
             print(f"Could not find View Report button by text: {e}")
+
+        if not button_clicked:
             # Alternative: look for any submit button in the form
             submit_buttons = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
             if submit_buttons:
+                print(f"→ Found {len(submit_buttons)} submit buttons, clicking first one\n")
                 submit_buttons[0].click()
 
         print("Report form submitted!")
         time.sleep(3)
+        print(f"→ Current URL after submission: {self.driver.current_url}")
+        print(f"→ Window handles: {len(self.driver.window_handles)}\n")
 
     def download_excel_from_report(self):
         """Switch to report viewer tab and download Excel"""
+        print("Looking for Excel export button...")
+        print(f"→ Initial window handles: {len(self.driver.window_handles)}")
+        print(f"→ Current URL: {self.driver.current_url}\n")
+
         # Wait for new tab to open
-        time.sleep(2)
+        print("→ Waiting 3 seconds for new tab to open...")
+        time.sleep(3)
 
         # Switch to the new tab (report viewer)
         if len(self.driver.window_handles) > 1:
+            print(f"→ New tab detected! Total windows: {len(self.driver.window_handles)}")
             print("Switching to report viewer tab...")
             self.driver.switch_to.window(self.driver.window_handles[-1])
+            print(f"→ Switched to new tab\n")
+        else:
+            print(f"→ No new tab opened, staying on current window\n")
+
+        # Get current URL for debugging
+        current_url = self.driver.current_url
+        print(f"→ Current URL after tab switch: {current_url}")
+        print(f"→ Page title: {self.driver.title}\n")
 
         # Wait for the report viewer to load
-        wait = WebDriverWait(self.driver, 15)
+        wait = WebDriverWait(self.driver, 20)
 
-        # Wait for the page to load
-        time.sleep(3)
+        # Wait for page to be fully loaded
+        print("→ Waiting for page to load completely (5 seconds)...")
+        time.sleep(5)
+        print(f"→ Current URL after wait: {self.driver.current_url}\n")
 
-        print("Looking for Excel export button...")
+        # Take screenshot for debugging
+        try:
+            screenshot_path = os.path.join(self.download_dir, "debug_screenshot.png")
+            self.driver.save_screenshot(screenshot_path)
+            print(f"→ Screenshot saved to: {screenshot_path}")
+        except Exception as e:
+            print(f"→ Could not save screenshot: {e}")
+
+        # Get page source for debugging
+        try:
+            page_source_path = os.path.join(self.download_dir, "page_source.html")
+            with open(page_source_path, "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
+            print(f"→ Page source saved to: {page_source_path}\n")
+        except Exception as e:
+            print(f"→ Could not save page source: {e}\n")
+
+        print("→ Starting Excel button search...")
 
         # Try multiple methods to find and click the Excel button
         excel_clicked = False
 
-        # Method 1: Try by link text
-        try:
-            excel_link = wait.until(
-                EC.element_to_be_clickable((By.LINK_TEXT, "Excel"))
-            )
-            excel_link.click()
-            excel_clicked = True
-            print("Excel export button clicked (Method 1)")
-        except:
-            pass
+        # Method 1: Try by link text with explicit wait
+        if not excel_clicked:
+            try:
+                print("Method 1: Waiting for Excel link by text...")
+                excel_link = wait.until(
+                    EC.element_to_be_clickable((By.LINK_TEXT, "Excel"))
+                )
+                excel_link.click()
+                excel_clicked = True
+                print("Excel export button clicked (Method 1 - Link Text)")
+            except Exception as e:
+                print(f"Method 1 failed: {e}")
 
         # Method 2: Try by partial link text
         if not excel_clicked:
             try:
+                print("Method 2: Trying partial link text...")
                 excel_link = wait.until(
                     EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Excel"))
                 )
                 excel_link.click()
                 excel_clicked = True
-                print("Excel export button clicked (Method 2)")
-            except:
-                pass
+                print("Excel export button clicked (Method 2 - Partial Link)")
+            except Exception as e:
+                print(f"Method 2 failed: {e}")
 
-        # Method 3: Try JavaScript click on the specific onclick pattern
+        # Method 3: Find all links and look for Excel
         if not excel_clicked:
             try:
+                print("Method 3: Searching all links for Excel...")
+                all_links = self.driver.find_elements(By.TAG_NAME, "a")
+                print(f"Found {len(all_links)} links on page")
+                for link in all_links:
+                    link_text = link.text.strip()
+                    link_title = link.get_attribute("title") or ""
+                    if "excel" in link_text.lower() or "excel" in link_title.lower():
+                        print(f"Found Excel link: text='{link_text}', title='{link_title}'")
+                        link.click()
+                        excel_clicked = True
+                        print("Excel export button clicked (Method 3 - Link Search)")
+                        break
+            except Exception as e:
+                print(f"Method 3 failed: {e}")
+
+        # Method 4: Try JavaScript click on the specific onclick pattern
+        if not excel_clicked:
+            try:
+                print("Method 4: Trying JavaScript click...")
                 script = """
                 var links = document.querySelectorAll('a[onclick*="exportReport"]');
+                console.log('Found ' + links.length + ' links with exportReport');
                 for (var i = 0; i < links.length; i++) {
-                    if (links[i].title === 'Excel' || links[i].innerText.includes('Excel')) {
+                    var title = links[i].title || '';
+                    var text = links[i].innerText || '';
+                    console.log('Link ' + i + ': title=' + title + ', text=' + text);
+                    if (title.toLowerCase().includes('excel') || text.toLowerCase().includes('excel')) {
                         links[i].click();
                         return true;
                     }
@@ -204,19 +286,60 @@ class SekureIDAutomation:
                 result = self.driver.execute_script(script)
                 if result:
                     excel_clicked = True
-                    print("Excel export button clicked (Method 3 - JavaScript)")
-            except Exception as e:
-                print(f"Method 3 failed: {e}")
-
-        # Method 4: Execute the export command directly
-        if not excel_clicked:
-            try:
-                script = "$find('ReportViewer1').exportReport('EXCELOPENXML');"
-                self.driver.execute_script(script)
-                excel_clicked = True
-                print("Excel export initiated (Method 4 - Direct command)")
+                    print("Excel export button clicked (Method 4 - JavaScript)")
             except Exception as e:
                 print(f"Method 4 failed: {e}")
+
+        # Method 5: Wait for ASP.NET scripts to load and try direct export
+        if not excel_clicked:
+            try:
+                print("Method 5: Waiting for ASP.NET ReportViewer to initialize...")
+                # Wait for the ReportViewer scripts to load
+                time.sleep(5)
+
+                # Check if $find is available
+                script_check = """
+                return typeof $find !== 'undefined';
+                """
+                find_available = self.driver.execute_script(script_check)
+                print(f"$find function available: {find_available}")
+
+                if find_available:
+                    script = "$find('ReportViewer1').exportReport('EXCELOPENXML');"
+                    self.driver.execute_script(script)
+                    excel_clicked = True
+                    print("Excel export initiated (Method 5 - Direct ASP.NET command)")
+                else:
+                    print("$find function not available - ReportViewer not initialized")
+            except Exception as e:
+                print(f"Method 5 failed: {e}")
+
+        # Method 6: Try to find export button by ID or class
+        if not excel_clicked:
+            try:
+                print("Method 6: Looking for export buttons by ID/class...")
+                # Common ReportViewer export button patterns
+                export_selectors = [
+                    "a[title*='Excel']",
+                    "a[title*='excel']",
+                    "[id*='Excel']",
+                    "[class*='Excel']",
+                    "a.ActiveLink[title='Excel']"
+                ]
+
+                for selector in export_selectors:
+                    try:
+                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                        if elements:
+                            print(f"Found element with selector: {selector}")
+                            elements[0].click()
+                            excel_clicked = True
+                            print(f"Excel export button clicked (Method 6 - CSS: {selector})")
+                            break
+                    except:
+                        continue
+            except Exception as e:
+                print(f"Method 6 failed: {e}")
 
         if excel_clicked:
             print("Waiting for download to complete...")
@@ -224,7 +347,11 @@ class SekureIDAutomation:
             downloaded_file = self.wait_for_download()
             return downloaded_file
         else:
-            raise Exception("Could not find or click Excel export button")
+            print("\n=== DEBUG INFO ===")
+            print(f"Current URL: {self.driver.current_url}")
+            print(f"Page Title: {self.driver.title}")
+            print(f"Window handles: {len(self.driver.window_handles)}")
+            raise Exception("Could not find or click Excel export button. Check debug files in download directory.")
 
     def wait_for_download(self, timeout=30):
         """Wait for the download to complete and return the file path"""
@@ -288,6 +415,24 @@ class SekureIDAutomation:
 
         except Exception as e:
             print(f"Error during automation: {e}")
+
+            # Save error screenshot and page source for debugging
+            try:
+                if self.driver:
+                    error_screenshot = os.path.join(self.download_dir, "error_screenshot.png")
+                    self.driver.save_screenshot(error_screenshot)
+                    print(f"Error screenshot saved to: {error_screenshot}")
+
+                    error_page_source = os.path.join(self.download_dir, "error_page_source.html")
+                    with open(error_page_source, "w", encoding="utf-8") as f:
+                        f.write(self.driver.page_source)
+                    print(f"Error page source saved to: {error_page_source}")
+
+                    print(f"Current URL at error: {self.driver.current_url}")
+                    print(f"Page title at error: {self.driver.title}")
+            except Exception as debug_error:
+                print(f"Could not save debug info: {debug_error}")
+
             raise
         finally:
             # Always cleanup

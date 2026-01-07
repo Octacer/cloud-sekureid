@@ -203,13 +203,53 @@ def _generate_report_internal(
         raise
 
     except Exception as e:
-        # Cleanup on error
+        # Check for debug files before cleanup
+        debug_info = {}
+        try:
+            debug_screenshot = os.path.join(download_dir, "error_screenshot.png")
+            debug_page_source = os.path.join(download_dir, "error_page_source.html")
+            page_source_file = os.path.join(download_dir, "page_source.html")
+
+            # Check if debug files exist
+            if os.path.exists(debug_screenshot):
+                # Save debug files to a persistent location
+                debug_id = str(uuid.uuid4())
+                debug_dir = os.path.join(DOWNLOADS_DIR, f"debug_{debug_id}")
+                os.makedirs(debug_dir, exist_ok=True)
+
+                if os.path.exists(debug_screenshot):
+                    shutil.copy(debug_screenshot, os.path.join(debug_dir, "error_screenshot.png"))
+                if os.path.exists(debug_page_source):
+                    shutil.copy(debug_page_source, os.path.join(debug_dir, "error_page_source.html"))
+                if os.path.exists(page_source_file):
+                    shutil.copy(page_source_file, os.path.join(debug_dir, "page_source.html"))
+
+                base_url = str(request.base_url).rstrip('/')
+                debug_info = {
+                    "debug_screenshot": f"{base_url}/files/debug_{debug_id}/error_screenshot.png",
+                    "debug_page_source": f"{base_url}/files/debug_{debug_id}/error_page_source.html",
+                    "debug_id": debug_id
+                }
+                print(f"Debug files saved. Debug ID: {debug_id}")
+        except Exception as debug_error:
+            print(f"Could not save debug files: {debug_error}")
+
+        # Cleanup temp directory
         shutil.rmtree(download_dir, ignore_errors=True)
 
         print(f"Error generating report: {e}")
+
+        # Include debug info in error response
+        error_detail = {
+            "error": str(e),
+            "message": "Failed to generate report",
+        }
+        if debug_info:
+            error_detail["debug"] = debug_info
+
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to generate report: {str(e)}"
+            detail=error_detail
         )
 
 

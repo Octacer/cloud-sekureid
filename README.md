@@ -390,6 +390,87 @@ The file includes:
 - Error testing scenarios
 - Helpful comments and examples
 
+## Debugging
+
+### Debug Mode on Server
+
+When errors occur, the system automatically captures debug information:
+
+**1. Error Response with Debug URLs**
+
+When an error occurs, the API returns debug information:
+```json
+{
+  "error": "Could not find or click Excel export button",
+  "message": "Failed to generate report",
+  "debug": {
+    "debug_screenshot": "https://sekureid.octacer.info/files/debug_abc-123/error_screenshot.png",
+    "debug_page_source": "https://sekureid.octacer.info/files/debug_abc-123/error_page_source.html",
+    "debug_id": "abc-123"
+  }
+}
+```
+
+**2. Access Debug Files**
+
+Open the URLs in your browser to see what went wrong:
+- **Screenshot**: Visual snapshot of the browser at the moment of error
+- **Page Source**: Complete HTML of the page for inspection
+
+**3. Debug Logs in Docker**
+
+View detailed console logs:
+```bash
+# View live logs
+docker-compose logs -f
+
+# View last 100 lines
+docker-compose logs --tail=100
+
+# Save logs to file
+docker-compose logs > debug.log
+```
+
+**4. What to Look For**
+
+In the logs, you'll see:
+```
+Current URL: https://cloud.sekure-id.com/Reports/ReportViewer.aspx
+Found 25 links on page
+Method 1: Waiting for Excel link by text...
+Method 1 failed: Message: Timeout...
+Method 2: Trying partial link text...
+Method 3: Searching all links for Excel...
+Found Excel link: text='Excel', title='Excel'
+Excel export button clicked (Method 3 - Link Search)
+```
+
+**5. Common Issues and Solutions**
+
+| Issue | Log Shows | Solution |
+|-------|-----------|----------|
+| Page not loaded | `$find is not defined` | Increase wait time in code |
+| Wrong page | `Current URL: ...` not report viewer | Check form submission |
+| No Excel button | `Found 0 links` | Check screenshot - page may have error |
+| Timeout | `Method X failed: Timeout` | Network slow, increase timeout |
+
+**6. Manual Debugging via Shell**
+
+Access the running container:
+```bash
+# Enter container
+docker exec -it sekureid-report-generator /bin/bash
+
+# Check download directory
+ls -la /home/appuser/downloads/
+
+# View recent debug files
+find /home/appuser/downloads -name "*.png" -o -name "*.html"
+
+# Check Chrome is working
+chromium --version
+```
+
 ## Troubleshooting
 
 ### Docker Issues
