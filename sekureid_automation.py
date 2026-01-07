@@ -114,19 +114,19 @@ class SekureIDAutomation:
         """
         wait = WebDriverWait(self.driver, 10)
 
-        # Set date
-        if report_date is None:
-            report_date = datetime.now().strftime("%Y-%m-%d")
+        # # Set date
+        # if report_date is None:
+        #     report_date = datetime.now().strftime("%Y-%m-%d")
 
-        print(f"Setting report date to: {report_date}")
-        print(f"→ Current URL: {self.driver.current_url}\n")
+        # print(f"Setting report date to: {report_date}")
+        # print(f"→ Current URL: {self.driver.current_url}\n")
 
-        date_field = wait.until(
-            EC.presence_of_element_located((By.ID, "Date"))
-        )
-        date_field.clear()
-        date_field.send_keys(report_date)
-        print(f"→ Date field filled with: {report_date}\n")
+        # date_field = wait.until(
+        #     EC.presence_of_element_located((By.ID, "Date"))
+        # )
+        # date_field.clear()
+        # date_field.send_keys(report_date)
+        # print(f"→ Date field filled with: {report_date}\n")
 
         # Select "Daily Machine Raw Data" report type
         print("Selecting report type...")
@@ -135,8 +135,31 @@ class SekureIDAutomation:
             EC.presence_of_element_located((By.ID, "ReportName"))
         )
         report_dropdown = Select(report_select)
-        report_dropdown.select_by_visible_text("Daily Machine Raw Data")
-        print(f"→ Selected report type: Daily Machine Raw Data\n")
+
+        # Log all available options for debugging
+        all_options = [option.text for option in report_dropdown.options]
+        print(f"→ Available report types: {all_options}")
+
+        # Try to select by visible text (try multiple variations)
+        selected = False
+        for option_text in all_options:
+            if "Daily Machine Raw Data" in option_text or "Machine Raw" in option_text:
+                try:
+                    report_dropdown.select_by_visible_text(option_text)
+                    print(f"→ Selected report type: {option_text}\n")
+                    selected = True
+                    break
+                except:
+                    continue
+
+        if not selected:
+            # Fallback: try selecting by value
+            try:
+                report_dropdown.select_by_value("Daily Machine Raw Data")
+                print(f"→ Selected report type by value: Daily Machine Raw Data\n")
+                selected = True
+            except:
+                print(f"→ WARNING: Could not select 'Daily Machine Raw Data', using default\n")
 
         # Wait a bit for any dynamic content to load
         time.sleep(2)
