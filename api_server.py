@@ -4,15 +4,17 @@ Exposes the automation as a REST API endpoint
 """
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import Optional, Dict
+from pydantic import BaseModel, HttpUrl
+from typing import Optional, Dict, List
 import os
 import shutil
 from datetime import datetime, timedelta
 import uuid
 import asyncio
+import requests
+from pdf2image import convert_from_path
 from sekureid_automation import SekureIDAutomation
 
 # Get base URL from environment variable
@@ -41,9 +43,23 @@ class ReportResponse(BaseModel):
     expires_in: int  # seconds
 
 
+class PdfToImageRequest(BaseModel):
+    pdf_url: HttpUrl  # Publicly accessible PDF URL
+
+
+class PdfToImageResponse(BaseModel):
+    images: List[Dict[str, str]]  # List of {page: 1, url: "..."}
+    total_pages: int
+    conversion_id: str
+    generated_at: str
+    expires_in: int  # seconds
+
+
 # Store for tracking download files
 TEMP_DIR = os.path.join(os.getcwd(), "temp_reports")
 DOWNLOADS_DIR = os.path.join(os.getcwd(), "downloads")
+PDF_TEMP_DIR = os.path.join(os.getcwd(), "temp_pdf")
+os.makedirs(PDF_TEMP_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
@@ -68,6 +84,17 @@ async def cleanup_file_after_delay(file_id: str, filepath: str, delay: int = 360
         print(f"Error cleaning up {filepath}: {e}")
 
 
+async def cleanup_directory_after_delay(directory: str, delay: int = 3600):
+    """Background task to cleanup directory after delay (default 1 hour)"""
+    await asyncio.sleep(delay)
+    try:
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+            print(f"Cleaned up directory: {directory}")
+    except Exception as e:
+        print(f"Error cleaning up directory {directory}: {e}")
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -80,6 +107,7 @@ async def root():
             "GET /get-report-default": "Generate today's report with defaults (JSON with URL)",
             "GET /get-report-default-direct": "Generate and directly download today's report",
             "GET /download/{file_id}": "Download a generated report by file ID",
+            "POST /pdf-to-png": "Convert PDF to PNG images (provide public PDF URL)",
             "GET /debug": "List all debug sessions (when errors occur)",
             "GET /debug/{debug_id}": "Get debug files for a specific debug session",
             "GET /health": "Health check endpoint"
@@ -526,6 +554,109 @@ async def download_file(file_id: str):
             "Content-Disposition": f"attachment; filename={display_filename}"
         }
     )
+
+
+@app.post("/pdf-to-png", response_model=PdfToImageResponse)
+async def pdf_to_png(
+    request: PdfToImageRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Convert PDF to PNG images
+
+    Parameters:
+    - pdf_url: Publicly accessible URL to the PDF file
+
+    Returns:
+    - JSON with list of PNG image URLs, one per page
+    """
+    conversion_id = str(uuid.uuid4())
+    temp_pdf_dir = os.path.join(PDF_TEMP_DIR, conversion_id)
+    os.makedirs(temp_pdf_dir, exist_ok=True)
+
+    try:
+        print(f"Processing PDF conversion request: {conversion_id}")
+        print(f"→ PDF URL: {request.pdf_url}")
+
+        # Download PDF file
+        pdf_path = os.path.join(temp_pdf_dir, "input.pdf")
+        print(f"→ Downloading PDF...")
+
+        response = requests.get(str(request.pdf_url), timeout=30, stream=True)
+        response.raise_for_status()
+
+        with open(pdf_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"→ PDF downloaded: {os.path.getsize(pdf_path)} bytes")
+
+        # Convert PDF to images
+        print(f"→ Converting PDF to PNG images...")
+        images = convert_from_path(
+            pdf_path,
+            dpi=200,  # High quality
+            fmt='png'
+        )
+
+        total_pages = len(images)
+        print(f"→ Converted {total_pages} pages")
+
+        # Save images to downloads directory
+        conversion_dir = os.path.join(DOWNLOADS_DIR, f"pdf_{conversion_id}")
+        os.makedirs(conversion_dir, exist_ok=True)
+
+        image_list = []
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        for i, image in enumerate(images, start=1):
+            image_filename = f"{timestamp}_page_{i}.png"
+            image_path = os.path.join(conversion_dir, image_filename)
+            image.save(image_path, 'PNG')
+
+            image_url = f"{BASE_DOMAIN}/files/pdf_{conversion_id}/{image_filename}"
+            image_list.append({
+                "page": i,
+                "url": image_url,
+                "filename": image_filename
+            })
+            print(f"→ Saved page {i}/{total_pages}: {image_filename}")
+
+        # Cleanup temp directory
+        shutil.rmtree(temp_pdf_dir, ignore_errors=True)
+
+        # Schedule cleanup after 1 hour
+        background_tasks.add_task(cleanup_directory_after_delay, conversion_dir, 3600)
+
+        generated_at = datetime.now()
+
+        print(f"→ Conversion complete: {conversion_id}\n")
+
+        return PdfToImageResponse(
+            images=image_list,
+            total_pages=total_pages,
+            conversion_id=conversion_id,
+            generated_at=generated_at.isoformat(),
+            expires_in=3600  # 1 hour
+        )
+
+    except requests.RequestException as e:
+        # Cleanup temp directory
+        shutil.rmtree(temp_pdf_dir, ignore_errors=True)
+        print(f"Error downloading PDF: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to download PDF from URL: {str(e)}"
+        )
+
+    except Exception as e:
+        # Cleanup temp directory
+        shutil.rmtree(temp_pdf_dir, ignore_errors=True)
+        print(f"Error converting PDF: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to convert PDF to PNG: {str(e)}"
+        )
 
 
 @app.on_event("shutdown")
