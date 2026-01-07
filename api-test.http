@@ -244,6 +244,16 @@ Content-Type: application/json
   "pdf_url": "https://example.com/your-pdf-file.pdf"
 }
 
+###
+
+### Convert PDF from Octacer Stories
+POST {{baseUrl}}/pdf-to-png
+Content-Type: application/json
+
+{
+  "pdf_url": "https://stories.octacer.com/api/story/download/pdf/f16ce3da-17d7-48f7-858e-b5ee62f1ee1b"
+}
+
 ###############################################################################
 # Debug Endpoints (When Errors Occur)
 ###############################################################################

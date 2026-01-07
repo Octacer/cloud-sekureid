@@ -47,8 +47,14 @@ class PdfToImageRequest(BaseModel):
     pdf_url: HttpUrl  # Publicly accessible PDF URL
 
 
+class ImageInfo(BaseModel):
+    page: int
+    url: str
+    filename: str
+
+
 class PdfToImageResponse(BaseModel):
-    images: List[Dict[str, str]]  # List of {page: 1, url: "..."}
+    images: List[ImageInfo]
     total_pages: int
     conversion_id: str
     generated_at: str
@@ -615,11 +621,11 @@ async def pdf_to_png(
             image.save(image_path, 'PNG')
 
             image_url = f"{BASE_DOMAIN}/files/pdf_{conversion_id}/{image_filename}"
-            image_list.append({
-                "page": i,
-                "url": image_url,
-                "filename": image_filename
-            })
+            image_list.append(ImageInfo(
+                page=i,
+                url=image_url,
+                filename=image_filename
+            ))
             print(f"→ Saved page {i}/{total_pages}: {image_filename}")
 
         # Cleanup temp directory
