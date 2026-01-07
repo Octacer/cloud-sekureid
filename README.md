@@ -1,0 +1,489 @@
+# Sekure-ID Cloud Report Generator API
+
+Automated report generation and download system for Sekure-ID Cloud attendance system. This tool automates the process of logging in, generating reports, and downloading Excel files through a REST API.
+
+## Features
+
+- Automated login to Sekure-ID Cloud portal
+- Automated daily attendance report generation
+- Excel file download
+- REST API endpoint for easy integration
+- Configurable date range
+- Automatic cleanup of temporary files
+- **Fully headless operation** - Perfect for AWS EC2, cloud servers, and SSH-only environments
+- **No display/GUI required** - Runs completely in the background
+
+## Prerequisites
+
+### Using Docker (Recommended)
+- **Docker** and **Docker Compose** installed
+- No other dependencies required! Everything is containerized.
+
+### Using Python Directly
+1. **Python 3.8+**
+2. **Chrome or Chromium browser** installed
+3. **ChromeDriver** (compatible with your Chrome version)
+
+## Installation & Usage
+
+### Option 1: Run with Docker (Recommended - Zero Setup!)
+
+This is the easiest way to run the application. Everything including Chromium browser is included in the container. **Chrome runs in native headless mode** - perfect for AWS servers, cloud instances, or any environment without a display.
+
+**Quick Start:**
+
+1. Clone or navigate to this directory:
+```bash
+cd /mnt/c/git/octacer/cloud_sekureid
+```
+
+2. Build and start the container:
+```bash
+docker-compose up -d
+```
+
+3. The API is now running at `http://localhost:8000`
+
+4. Test the API:
+```bash
+curl -X POST http://localhost:8000/generate-report \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  --output report.xlsx
+```
+
+**Docker Commands:**
+
+```bash
+# Start the container
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the container
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up -d --build
+
+# Check container status
+docker-compose ps
+
+# Access container shell for debugging
+docker exec -it sekureid-report-generator /bin/bash
+```
+
+**Building Docker Image Manually:**
+
+```bash
+# Build the image
+docker build -t sekureid-api .
+
+# Run the container
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/downloads:/home/appuser/downloads \
+  --shm-size=2g \
+  --name sekureid-api \
+  sekureid-api
+```
+
+**Environment Variables with Docker:**
+
+You can pass credentials via environment variables:
+
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -e SEKUREID_COMPANY_CODE=85 \
+  -e SEKUREID_USERNAME=your_username \
+  -e SEKUREID_PASSWORD=your_password \
+  --shm-size=2g \
+  --name sekureid-api \
+  sekureid-api
+```
+
+Or edit the `docker-compose.yml` file to set your credentials.
+
+### Option 2: Run with Python Directly
+
+If you prefer to run without Docker:
+
+**Installing ChromeDriver:**
+
+**On Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install chromium-chromedriver
+```
+
+**On Windows:**
+1. Download ChromeDriver from https://chromedriver.chromium.org/
+2. Add the ChromeDriver location to your PATH
+
+**On macOS:**
+```bash
+brew install chromedriver
+```
+
+**Installation:**
+
+1. Clone or navigate to this directory:
+```bash
+cd /mnt/c/git/octacer/cloud_sekureid
+```
+
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+**Run as Standalone Script:**
+
+```bash
+python sekureid_automation.py
+```
+
+This will:
+- Login to Sekure-ID Cloud
+- Navigate to Daily Reports
+- Generate today's attendance report
+- Download the Excel file to `./downloads/` directory
+
+**Run as API Server:**
+
+```bash
+python api_server.py
+```
+
+The API will be available at `http://localhost:8000`
+
+Interactive API documentation: `http://localhost:8000/docs`
+
+## API Endpoints
+
+### POST /generate-report
+
+Generate and download attendance report.
+
+**Request Body:**
+```json
+{
+  "company_code": "85",
+  "username": "hisham.octacer",
+  "password": "P@ss1234",
+  "report_date": "2024-01-15"
+}
+```
+
+All fields are optional. Default values:
+- `company_code`: "85"
+- `username`: "hisham.octacer"
+- `password`: "P@ss1234"
+- `report_date`: Today's date (format: YYYY-MM-DD)
+
+**Response:**
+- Success: Excel file download (Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet)
+- Error: JSON with error details
+
+### Example API Calls
+
+**Using curl:**
+```bash
+# Generate today's report with default credentials
+curl -X POST http://localhost:8000/generate-report \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  --output report.xlsx
+
+# Generate report for specific date
+curl -X POST http://localhost:8000/generate-report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_code": "85",
+    "username": "hisham.octacer",
+    "password": "P@ss1234",
+    "report_date": "2024-01-15"
+  }' \
+  --output report_2024-01-15.xlsx
+```
+
+**Using Python requests:**
+```python
+import requests
+
+url = "http://localhost:8000/generate-report"
+data = {
+    "company_code": "85",
+    "username": "hisham.octacer",
+    "password": "P@ss1234",
+    "report_date": "2024-01-15"
+}
+
+response = requests.post(url, json=data)
+
+if response.status_code == 200:
+    with open("report.xlsx", "wb") as f:
+        f.write(response.content)
+    print("Report downloaded successfully!")
+else:
+    print(f"Error: {response.json()}")
+```
+
+**Using JavaScript/fetch:**
+```javascript
+fetch('http://localhost:8000/generate-report', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    company_code: '85',
+    username: 'hisham.octacer',
+    password: 'P@ss1234',
+    report_date: '2024-01-15'
+  })
+})
+.then(response => response.blob())
+.then(blob => {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'report.xlsx';
+  a.click();
+});
+```
+
+### GET /health
+
+Health check endpoint to verify API is running.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T10:30:00"
+}
+```
+
+## Configuration
+
+### Changing Default Credentials
+
+Edit the default values in `api_server.py`:
+
+```python
+class ReportRequest(BaseModel):
+    company_code: str = "YOUR_COMPANY_CODE"
+    username: str = "YOUR_USERNAME"
+    password: str = "YOUR_PASSWORD"
+    report_date: Optional[str] = None
+```
+
+### Changing Download Directory
+
+When initializing the automation class:
+
+```python
+automation = SekureIDAutomation(download_dir="/path/to/downloads")
+```
+
+### Headless Mode (AWS/Cloud Servers)
+
+The application is **already configured for headless operation** and will work perfectly on:
+- AWS EC2 instances
+- Google Cloud Compute
+- Azure VMs
+- DigitalOcean Droplets
+- Any server accessed via SSH without GUI
+
+Chrome runs with `--headless=new` flag which is the latest and most stable headless mode. No Xvfb or virtual display needed!
+
+## Project Structure
+
+```
+cloud_sekureid/
+├── sekureid_automation.py  # Core Selenium automation script
+├── api_server.py           # FastAPI REST API wrapper
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Docker container configuration
+├── docker-compose.yml      # Docker Compose configuration
+├── .dockerignore           # Docker ignore file
+├── README.md              # This file
+├── downloads/             # Default download directory (created automatically)
+└── temp_reports/          # Temporary files for API (created automatically)
+```
+
+## Troubleshooting
+
+### Docker Issues
+
+**Container fails to start:**
+```bash
+# Check logs
+docker-compose logs -f
+
+# Check container status
+docker ps -a
+
+# Rebuild from scratch
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+**Chromium/Browser issues in Docker:**
+- Chrome runs in native headless mode (--headless=new) - no virtual display needed
+- If you see browser crashes, ensure `--shm-size=2g` is set (required for Chromium)
+- If you see "DevToolsActivePort file doesn't exist", it usually means Chrome crashed - check memory limits
+- Check logs: `docker-compose logs -f`
+
+**Permission errors:**
+- The container runs as non-root user `appuser`
+- If mounting volumes, ensure permissions are correct
+
+### Python Direct Installation Issues
+
+**Chrome/ChromeDriver Version Mismatch:**
+
+If you get an error about ChromeDriver version:
+1. Check your Chrome version: `google-chrome --version` or `chromium --version`
+2. Download matching ChromeDriver from https://chromedriver.chromium.org/
+3. Update your PATH or specify the driver location
+
+### General Issues
+
+**Login Fails:**
+
+- Verify credentials are correct
+- Check if the website structure has changed
+- Ensure you have network access to cloud.sekure-id.com
+- Check API logs for detailed error messages
+
+**Download Times Out:**
+
+- Increase timeout in `wait_for_download()` method
+- Check network speed
+- Verify the report is generating correctly on the website
+
+**API Returns 500 Error:**
+
+- Check the API logs for detailed error messages
+- If using Docker: `docker-compose logs -f`
+- If using Python directly: Check console output
+- Ensure ChromeDriver is properly installed (or use Docker to avoid this issue)
+- Verify all dependencies are installed: `pip install -r requirements.txt`
+
+**Report generation takes too long:**
+
+- The first run may take longer as the browser initializes
+- Typical generation time: 15-30 seconds
+- If consistently slow, check your network connection to cloud.sekure-id.com
+
+## Security Considerations
+
+- **Do not commit credentials** to version control
+- Consider using environment variables for sensitive data:
+  ```python
+  import os
+  username = os.getenv("SEKUREID_USERNAME")
+  password = os.getenv("SEKUREID_PASSWORD")
+  ```
+- Use HTTPS in production
+- Implement authentication for the API endpoint
+- Rate limit the API to prevent abuse
+
+## Production Deployment
+
+### Docker Deployment (Recommended)
+
+**Using Docker Compose:**
+
+1. Edit `docker-compose.yml` to set your credentials:
+```yaml
+environment:
+  - SEKUREID_COMPANY_CODE=your_code
+  - SEKUREID_USERNAME=your_username
+  - SEKUREID_PASSWORD=your_password
+```
+
+2. Deploy:
+```bash
+docker-compose up -d
+```
+
+3. Set up nginx reverse proxy with SSL:
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Increase timeout for report generation
+        proxy_read_timeout 120s;
+        proxy_connect_timeout 120s;
+    }
+}
+```
+
+4. Enable monitoring:
+```bash
+# View logs
+docker-compose logs -f
+
+# Set up log rotation
+docker-compose up -d --log-opt max-size=10m --log-opt max-file=3
+```
+
+**Production Considerations:**
+
+1. **Use environment variables for credentials** (never hardcode in files)
+2. **Run behind a reverse proxy (nginx/traefik)** with HTTPS
+3. **Add authentication/API keys** to protect the endpoint
+4. **Set up logging and monitoring** (ELK stack, Prometheus, etc.)
+5. **Configure resource limits** in docker-compose.yml
+6. **Enable automatic container restart** (already configured in docker-compose.yml)
+7. **Regular backups** of configuration and data
+8. **Health checks** (already configured)
+
+### Python Direct Deployment
+
+For systemd service (if not using Docker):
+
+```ini
+[Unit]
+Description=Sekure-ID Report Generator API
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/cloud_sekureid
+Environment="PATH=/usr/bin:/usr/local/bin"
+Environment="DISPLAY=:99"
+ExecStartPre=/usr/bin/Xvfb :99 -screen 0 1920x1080x24 &
+ExecStart=/usr/bin/python3 api_server.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## License
+
+This is an internal automation tool for Octacer. Use at your own risk.
+
+## Support
+
+For issues or questions, contact the development team.
