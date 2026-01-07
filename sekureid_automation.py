@@ -128,39 +128,28 @@ class SekureIDAutomation:
         date_field.send_keys(report_date)
         print(f"→ Date field filled with: {report_date}\n")
 
-        # The form has default values selected for Company Name (Octacer, My Construction)
-        # and the default report type is "Daily Attendance"
-        # We'll keep these defaults unless you want to change them
+        # Select "Daily Machine Raw Data" report type
+        print("Selecting report type...")
+        from selenium.webdriver.support.ui import Select
+        report_select = wait.until(
+            EC.presence_of_element_located((By.ID, "ReportName"))
+        )
+        report_dropdown = Select(report_select)
+        report_dropdown.select_by_visible_text("Daily Machine Raw Data")
+        print(f"→ Selected report type: Daily Machine Raw Data\n")
 
         # Wait a bit for any dynamic content to load
         time.sleep(2)
 
-        # Find and click the View Report button
+        # Find and click the View Report button by ID
         print("Clicking View Report button...")
         print(f"→ Current URL before click: {self.driver.current_url}")
 
-        # The button might be found by text or by searching for submit buttons
-        button_clicked = False
-        try:
-            # Try to find by button text
-            view_report_buttons = self.driver.find_elements(By.TAG_NAME, "button")
-            print(f"→ Found {len(view_report_buttons)} buttons on page")
-            for button in view_report_buttons:
-                button_text = button.text.strip()
-                if "View" in button_text or "Report" in button_text:
-                    print(f"→ Clicking button with text: '{button_text}'\n")
-                    button.click()
-                    button_clicked = True
-                    break
-        except Exception as e:
-            print(f"Could not find View Report button by text: {e}")
-
-        if not button_clicked:
-            # Alternative: look for any submit button in the form
-            submit_buttons = self.driver.find_elements(By.CSS_SELECTOR, "button[type='submit']")
-            if submit_buttons:
-                print(f"→ Found {len(submit_buttons)} submit buttons, clicking first one\n")
-                submit_buttons[0].click()
+        view_report_button = wait.until(
+            EC.element_to_be_clickable((By.ID, "ViewReport"))
+        )
+        view_report_button.click()
+        print(f"→ Clicked ViewReport button (ID: ViewReport)\n")
 
         print("Report form submitted!")
         time.sleep(3)
