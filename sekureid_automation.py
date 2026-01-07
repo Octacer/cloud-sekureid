@@ -129,53 +129,73 @@ class SekureIDAutomation:
         # print(f"→ Date field filled with: {report_date}\n")
 
         # Select "Daily Machine Raw Data" report type
-        print("Selecting report type...")
-        from selenium.webdriver.support.ui import Select
-        report_select = wait.until(
-            EC.presence_of_element_located((By.ID, "ReportName"))
-        )
-        report_dropdown = Select(report_select)
+        try:
+            print("Selecting report type...")
+            from selenium.webdriver.support.ui import Select
+            report_select = wait.until(
+                EC.presence_of_element_located((By.ID, "ReportName"))
+            )
+            report_dropdown = Select(report_select)
 
-        # Log all available options for debugging
-        all_options = [option.text for option in report_dropdown.options]
-        print(f"→ Available report types: {all_options}")
+            # Log all available options for debugging
+            all_options = [option.text for option in report_dropdown.options]
+            all_values = [option.get_attribute("value") for option in report_dropdown.options]
+            print(f"→ Available report types (text): {all_options}")
+            print(f"→ Available report types (values): {all_values}\n")
 
-        # Try to select by visible text (try multiple variations)
-        selected = False
-        for option_text in all_options:
-            if "Daily Machine Raw Data" in option_text or "Machine Raw" in option_text:
-                try:
-                    report_dropdown.select_by_visible_text(option_text)
-                    print(f"→ Selected report type: {option_text}\n")
-                    selected = True
-                    break
-                except:
-                    continue
+            # Try to select by visible text (try multiple variations)
+            selected = False
+            for option_text in all_options:
+                if "Daily Machine Raw Data" in option_text or "Machine Raw" in option_text:
+                    try:
+                        report_dropdown.select_by_visible_text(option_text)
+                        print(f"→ Selected report type: {option_text}\n")
+                        selected = True
+                        break
+                    except Exception as e:
+                        print(f"→ Failed to select by text '{option_text}': {e}")
+                        continue
 
-        if not selected:
-            # Fallback: try selecting by value
-            try:
-                report_dropdown.select_by_value("Daily Machine Raw Data")
-                print(f"→ Selected report type by value: Daily Machine Raw Data\n")
-                selected = True
-            except:
+            if not selected:
+                # Fallback: try selecting by value
+                for option_value in all_values:
+                    if option_value and ("Daily Machine Raw Data" in option_value or "Machine Raw" in option_value):
+                        try:
+                            report_dropdown.select_by_value(option_value)
+                            print(f"→ Selected report type by value: {option_value}\n")
+                            selected = True
+                            break
+                        except Exception as e:
+                            print(f"→ Failed to select by value '{option_value}': {e}")
+                            continue
+
+            if not selected:
                 print(f"→ WARNING: Could not select 'Daily Machine Raw Data', using default\n")
 
-        # Wait a bit for any dynamic content to load
-        time.sleep(2)
+            # Wait a bit for any dynamic content to load
+            time.sleep(1)
+
+        except Exception as e:
+            print(f"→ ERROR selecting report type: {e}")
+            print(f"→ Continuing with default selection...\n")
 
         # Find and click the View Report button by ID
-        print("Clicking View Report button...")
-        print(f"→ Current URL before click: {self.driver.current_url}")
+        try:
+            print("Clicking View Report button...")
+            print(f"→ Current URL before click: {self.driver.current_url}")
 
-        view_report_button = wait.until(
-            EC.element_to_be_clickable((By.ID, "ViewReport"))
-        )
-        view_report_button.click()
-        print(f"→ Clicked ViewReport button (ID: ViewReport)\n")
+            view_report_button = wait.until(
+                EC.element_to_be_clickable((By.ID, "ViewReport"))
+            )
+            view_report_button.click()
+            print(f"→ Clicked ViewReport button (ID: ViewReport)\n")
+
+        except Exception as e:
+            print(f"→ ERROR clicking ViewReport button: {e}")
+            raise
 
         print("Report form submitted!")
-        time.sleep(3)
+        time.sleep(2)
         print(f"→ Current URL after submission: {self.driver.current_url}")
         print(f"→ Window handles: {len(self.driver.window_handles)}\n")
 
@@ -237,54 +257,10 @@ class SekureIDAutomation:
         # Try multiple methods to find and click the Excel button
         excel_clicked = False
 
-        # Method 1: Try by link text with explicit wait
+        # Method 1: Try JavaScript click on the specific onclick pattern (FASTEST - TRY FIRST)
         if not excel_clicked:
             try:
-                print("Method 1: Waiting for Excel link by text...")
-                excel_link = wait.until(
-                    EC.element_to_be_clickable((By.LINK_TEXT, "Excel"))
-                )
-                excel_link.click()
-                excel_clicked = True
-                print("Excel export button clicked (Method 1 - Link Text)")
-            except Exception as e:
-                print(f"Method 1 failed: {e}")
-
-        # Method 2: Try by partial link text
-        if not excel_clicked:
-            try:
-                print("Method 2: Trying partial link text...")
-                excel_link = wait.until(
-                    EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Excel"))
-                )
-                excel_link.click()
-                excel_clicked = True
-                print("Excel export button clicked (Method 2 - Partial Link)")
-            except Exception as e:
-                print(f"Method 2 failed: {e}")
-
-        # Method 3: Find all links and look for Excel
-        if not excel_clicked:
-            try:
-                print("Method 3: Searching all links for Excel...")
-                all_links = self.driver.find_elements(By.TAG_NAME, "a")
-                print(f"Found {len(all_links)} links on page")
-                for link in all_links:
-                    link_text = link.text.strip()
-                    link_title = link.get_attribute("title") or ""
-                    if "excel" in link_text.lower() or "excel" in link_title.lower():
-                        print(f"Found Excel link: text='{link_text}', title='{link_title}'")
-                        link.click()
-                        excel_clicked = True
-                        print("Excel export button clicked (Method 3 - Link Search)")
-                        break
-            except Exception as e:
-                print(f"Method 3 failed: {e}")
-
-        # Method 4: Try JavaScript click on the specific onclick pattern
-        if not excel_clicked:
-            try:
-                print("Method 4: Trying JavaScript click...")
+                print("Method 1: Trying JavaScript click...")
                 script = """
                 var links = document.querySelectorAll('a[onclick*="exportReport"]');
                 console.log('Found ' + links.length + ' links with exportReport');
@@ -302,7 +278,51 @@ class SekureIDAutomation:
                 result = self.driver.execute_script(script)
                 if result:
                     excel_clicked = True
-                    print("Excel export button clicked (Method 4 - JavaScript)")
+                    print("Excel export button clicked (Method 1 - JavaScript)")
+            except Exception as e:
+                print(f"Method 1 failed: {e}")
+
+        # Method 2: Try by link text with explicit wait
+        if not excel_clicked:
+            try:
+                print("Method 2: Waiting for Excel link by text...")
+                excel_link = wait.until(
+                    EC.element_to_be_clickable((By.LINK_TEXT, "Excel"))
+                )
+                excel_link.click()
+                excel_clicked = True
+                print("Excel export button clicked (Method 2 - Link Text)")
+            except Exception as e:
+                print(f"Method 2 failed: {e}")
+
+        # Method 3: Try by partial link text
+        if not excel_clicked:
+            try:
+                print("Method 3: Trying partial link text...")
+                excel_link = wait.until(
+                    EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, "Excel"))
+                )
+                excel_link.click()
+                excel_clicked = True
+                print("Excel export button clicked (Method 3 - Partial Link)")
+            except Exception as e:
+                print(f"Method 3 failed: {e}")
+
+        # Method 4: Find all links and look for Excel
+        if not excel_clicked:
+            try:
+                print("Method 4: Searching all links for Excel...")
+                all_links = self.driver.find_elements(By.TAG_NAME, "a")
+                print(f"Found {len(all_links)} links on page")
+                for link in all_links:
+                    link_text = link.text.strip()
+                    link_title = link.get_attribute("title") or ""
+                    if "excel" in link_text.lower() or "excel" in link_title.lower():
+                        print(f"Found Excel link: text='{link_text}', title='{link_title}'")
+                        link.click()
+                        excel_clicked = True
+                        print("Excel export button clicked (Method 4 - Link Search)")
+                        break
             except Exception as e:
                 print(f"Method 4 failed: {e}")
 

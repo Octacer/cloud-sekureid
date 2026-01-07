@@ -543,4 +543,5 @@ if __name__ == "__main__":
     print("API will be available at: http://localhost:8000")
     print("API documentation at: http://localhost:8000/docs")
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Increase timeout to 5 minutes for long-running automation
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=600)
