@@ -56,6 +56,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application files
 COPY --chown=appuser:appuser sekureid_automation.py .
+COPY --chown=appuser:appuser vollna_automation.py .
 COPY --chown=appuser:appuser api_server.py .
 
 # Switch to non-root user

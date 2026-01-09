@@ -214,6 +214,52 @@ Content-Type: application/json
 GET {{workflowUrl}}
 
 ###############################################################################
+# Vollna Cookies Extraction
+###############################################################################
+
+### Get Vollna Cookies (Default Credentials)
+# @name vollnaCookiesDefault
+GET {{baseUrl}}/get-vollna-cookies
+Accept: application/json
+
+###
+
+### Get Vollna Cookies (Custom Credentials)
+GET {{baseUrl}}/get-vollna-cookies?email=mateo@brightdock.com&password=Antonia.12&final_url=https://www.vollna.com/dashboard/filter/22703
+Accept: application/json
+
+###
+
+### Get Vollna Cookies (Custom Email Only)
+GET {{baseUrl}}/get-vollna-cookies?email=your@email.com
+Accept: application/json
+
+###
+
+### Get Vollna Cookies (Custom Final URL)
+GET {{baseUrl}}/get-vollna-cookies?final_url=https://www.vollna.com/dashboard
+Accept: application/json
+
+###
+
+### Extract cookies and store response
+# @name vollnaCookiesExtract
+GET {{baseUrl}}/get-vollna-cookies
+Accept: application/json
+
+###
+
+### Use the extracted cookies from previous request
+@extractedCookies = {{vollnaCookiesExtract.response.body.cookies}}
+@cookieCount = {{vollnaCookiesExtract.response.body.cookie_count}}
+@extractedAt = {{vollnaCookiesExtract.response.body.extracted_at}}
+
+### View extracted values (just for reference)
+# Cookies: {{extractedCookies}}
+# Count: {{cookieCount}}
+# Extracted at: {{extractedAt}}
+
+###############################################################################
 # PDF to PNG Conversion
 ###############################################################################
 
@@ -294,6 +340,9 @@ GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
 # 2. Direct Download Endpoints (Backwards Compatible):
 #    - GET  /get-report-default-direct   → Direct Excel download
 #    - POST /generate-report-direct      → Direct Excel download
+#
+# 3. Vollna Integration:
+#    - GET  /get-vollna-cookies          → Extract cookies from Vollna after login
 #
 # JSON Response Format:
 # {
