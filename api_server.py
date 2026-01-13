@@ -729,33 +729,52 @@ async def extract_text(
 
     try:
         print(f"\n{'='*80}")
-        print(f"Processing text extraction request: {request_id}")
+        print(f"[{request_id}] Processing text extraction request")
         print(f"{'='*80}")
-        print(f"→ URL: {request_data.url}")
+        print(f"[{request_id}] Current working directory: {os.getcwd()}")
+        print(f"[{request_id}] Temp directory: {temp_extract_dir}")
+        print(f"[{request_id}] URL: {request_data.url}")
 
         url_str = str(request_data.url)
+        print(f"[{request_id}] URL string: {url_str}")
 
         # Download file first
-        print(f"→ Downloading file...")
+        print(f"[{request_id}] Step 1: Downloading file from URL...")
+        print(f"[{request_id}] Timeout: 30 seconds, streaming: enabled")
         response = requests.get(url_str, timeout=30, stream=True)
+        print(f"[{request_id}] HTTP Status Code: {response.status_code}")
+        print(f"[{request_id}] Content-Length (header): {response.headers.get('content-length', 'N/A')}")
+        print(f"[{request_id}] Content-Type (header): {response.headers.get('content-type', 'N/A')}")
         response.raise_for_status()
 
         # Save to temporary location first
         temp_raw_file = os.path.join(temp_extract_dir, f"{request_id}_raw")
+        print(f"[{request_id}] Saving raw file to: {temp_raw_file}")
+        bytes_written = 0
         with open(temp_raw_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
+                bytes_written += len(chunk)
                 f.write(chunk)
 
-        print(f"→ File downloaded: {os.path.getsize(temp_raw_file)} bytes")
+        file_size = os.path.getsize(temp_raw_file)
+        print(f"[{request_id}] File saved successfully")
+        print(f"[{request_id}] Bytes written: {bytes_written}")
+        print(f"[{request_id}] File size on disk: {file_size} bytes")
+        print(f"[{request_id}] File exists: {os.path.exists(temp_raw_file)}")
 
         # Detect file type from actual file content using magic bytes
-        print(f"→ Detecting file type from content...")
-        mime = magic.Magic(mime=True)
-        detected_mime = mime.from_file(temp_raw_file)
-        print(f"→ Detected MIME type: {detected_mime}")
+        print(f"[{request_id}] Step 2: Detecting file type from content...")
+        try:
+            mime = magic.Magic(mime=True)
+            detected_mime = mime.from_file(temp_raw_file)
+            print(f"[{request_id}] Detected MIME type: {detected_mime}")
+        except Exception as mime_error:
+            print(f"[{request_id}] ERROR detecting MIME: {mime_error}")
+            raise
 
         # Map MIME type to file extension
         is_pdf = 'pdf' in detected_mime.lower()
+        print(f"[{request_id}] Is PDF: {is_pdf}")
 
         if is_pdf:
             file_extension = 'pdf'
@@ -774,53 +793,93 @@ async def extract_text(
                 file_extension = 'jpg'  # default
         else:
             # Fallback: assume image
+            print(f"[{request_id}] MIME type not recognized, defaulting to image/jpg")
             source_type = 'image'
             file_extension = 'jpg'
 
-        print(f"→ Source type: {source_type}")
-        print(f"→ File extension: {file_extension}")
+        print(f"[{request_id}] Source type: {source_type}")
+        print(f"[{request_id}] File extension: {file_extension}")
 
         # Rename temporary file to proper extension
         temp_file = os.path.join(temp_extract_dir, f"{request_id}.{file_extension}")
+        print(f"[{request_id}] Step 3: Renaming file")
+        print(f"[{request_id}] From: {temp_raw_file}")
+        print(f"[{request_id}] To: {temp_file}")
         os.rename(temp_raw_file, temp_file)
+        print(f"[{request_id}] File renamed successfully")
+        print(f"[{request_id}] Renamed file exists: {os.path.exists(temp_file)}")
 
-        print(f"→ File downloaded: {os.path.getsize(temp_file)} bytes")
+        file_size = os.path.getsize(temp_file)
+        print(f"[{request_id}] Final file size: {file_size} bytes")
 
         # Extract text
         extracted_text = ""
         total_pages = 0
 
+        print(f"[{request_id}] Step 4: Text extraction")
+
         if is_pdf:
-            print(f"→ Converting PDF to images for OCR...")
-            # Convert PDF to images
-            images = convert_from_path(temp_file, dpi=200)
-            total_pages = len(images)
-            print(f"→ PDF has {total_pages} pages")
+            print(f"[{request_id}] Processing PDF file")
+            print(f"[{request_id}] Converting PDF to images (DPI: 200)...")
+            try:
+                # Convert PDF to images
+                images = convert_from_path(temp_file, dpi=200)
+                total_pages = len(images)
+                print(f"[{request_id}] PDF conversion successful")
+                print(f"[{request_id}] Total pages: {total_pages}")
 
-            # Extract text from each page
-            print(f"→ Extracting text from PDF pages...")
-            page_texts = []
-            for i, image in enumerate(images, start=1):
-                print(f"  → Processing page {i}/{total_pages}...")
-                page_text = pytesseract.image_to_string(image)
-                page_texts.append(f"--- PAGE {i} ---\n{page_text}")
+                # Extract text from each page
+                print(f"[{request_id}] Extracting text from PDF pages...")
+                page_texts = []
+                for i, image in enumerate(images, start=1):
+                    print(f"[{request_id}] Processing page {i}/{total_pages}...")
+                    try:
+                        page_text = pytesseract.image_to_string(image)
+                        text_len = len(page_text.strip())
+                        print(f"[{request_id}] Page {i} extracted: {text_len} characters")
+                        page_texts.append(f"--- PAGE {i} ---\n{page_text}")
+                    except Exception as page_error:
+                        print(f"[{request_id}] ERROR extracting page {i}: {page_error}")
+                        page_texts.append(f"--- PAGE {i} ---\nERROR: {str(page_error)}")
 
-            extracted_text = "\n\n".join(page_texts)
+                extracted_text = "\n\n".join(page_texts)
+                print(f"[{request_id}] All pages processed")
+            except Exception as pdf_error:
+                print(f"[{request_id}] ERROR processing PDF: {pdf_error}")
+                raise
 
         else:
-            print(f"→ Extracting text from image...")
-            # Open image and extract text
-            image = Image.open(temp_file)
-            extracted_text = pytesseract.image_to_string(image)
-            total_pages = 1
+            print(f"[{request_id}] Processing image file")
+            print(f"[{request_id}] Opening image: {temp_file}")
+            try:
+                # Open image and extract text
+                image = Image.open(temp_file)
+                img_size = image.size
+                img_mode = image.mode
+                print(f"[{request_id}] Image opened successfully")
+                print(f"[{request_id}] Image size: {img_size}")
+                print(f"[{request_id}] Image mode: {img_mode}")
 
-        print(f"→ Text extraction complete")
-        print(f"→ Extracted text length: {len(extracted_text)} characters")
+                print(f"[{request_id}] Running Tesseract OCR on image...")
+                extracted_text = pytesseract.image_to_string(image)
+                print(f"[{request_id}] Tesseract OCR complete")
+                total_pages = 1
+            except Exception as img_error:
+                print(f"[{request_id}] ERROR processing image: {img_error}")
+                raise
+
+        print(f"[{request_id}] Text extraction complete")
+        print(f"[{request_id}] Total extracted text length: {len(extracted_text)} characters")
+        if extracted_text:
+            print(f"[{request_id}] Text preview (first 200 chars): {extracted_text[:200]}")
+        else:
+            print(f"[{request_id}] WARNING: No text extracted!")
 
         extracted_at = datetime.now()
+        print(f"[{request_id}] Extraction timestamp: {extracted_at.isoformat()}")
 
         print(f"\n{'='*80}")
-        print(f"Request completed successfully")
+        print(f"[{request_id}] Request completed successfully")
         print(f"{'='*80}\n")
 
         # Cleanup temp file
@@ -837,16 +896,23 @@ async def extract_text(
         )
 
     except requests.RequestException as e:
+        print(f"[{request_id}] REQUEST ERROR - {type(e).__name__}: {e}")
+        print(f"[{request_id}] Cleaning up temp directory: {temp_extract_dir}")
         shutil.rmtree(temp_extract_dir, ignore_errors=True)
-        print(f"Error downloading file: {e}")
+        print(f"[{request_id}] ERROR HANDLER: Failed to download file")
         raise HTTPException(
             status_code=400,
             detail=f"Failed to download file from URL: {str(e)}"
         )
 
     except Exception as e:
+        print(f"[{request_id}] GENERAL ERROR - {type(e).__name__}: {e}")
+        print(f"[{request_id}] Error traceback: {e}")
+        import traceback
+        print(f"[{request_id}] Full traceback: {traceback.format_exc()}")
+        print(f"[{request_id}] Cleaning up temp directory: {temp_extract_dir}")
         shutil.rmtree(temp_extract_dir, ignore_errors=True)
-        print(f"Error extracting text: {e}")
+        print(f"[{request_id}] ERROR HANDLER: Failed to extract text")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to extract text: {str(e)}"
