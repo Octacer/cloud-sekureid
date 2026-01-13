@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: cloud-sekureid:latest
     container_name: cloud-sekureid
     ports:
       - "3003:8000"
