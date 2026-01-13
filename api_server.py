@@ -17,6 +17,7 @@ import requests
 from pdf2image import convert_from_path
 from PIL import Image
 import pytesseract
+import magic
 from sekureid_automation import SekureIDAutomation
 from vollna_automation import VollnaAutomation
 
@@ -721,29 +722,59 @@ async def extract_text(
         print(f"→ URL: {request_data.url}")
 
         url_str = str(request_data.url)
-        file_extension = url_str.split('.')[-1].lower().split('?')[0]  # Handle query params
 
-        # Determine if it's a PDF or image
-        is_pdf = file_extension in ['pdf']
-        source_type = "pdf" if is_pdf else "image"
-
-        print(f"→ Source type: {source_type}")
-        print(f"→ File extension: {file_extension}")
-
-        # Download file
+        # Download file first
         print(f"→ Downloading file...")
         response = requests.get(url_str, timeout=30, stream=True)
         response.raise_for_status()
 
-        # Save file temporarily
+        # Save to temporary location first
+        temp_raw_file = os.path.join(temp_extract_dir, "temp_raw")
+        with open(temp_raw_file, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"→ File downloaded: {os.path.getsize(temp_raw_file)} bytes")
+
+        # Detect file type from actual file content using magic bytes
+        print(f"→ Detecting file type from content...")
+        mime = magic.Magic(mime=True)
+        detected_mime = mime.from_file(temp_raw_file)
+        print(f"→ Detected MIME type: {detected_mime}")
+
+        # Map MIME type to file extension
+        is_pdf = 'pdf' in detected_mime.lower()
+
+        if is_pdf:
+            file_extension = 'pdf'
+            source_type = 'pdf'
+        elif 'image' in detected_mime.lower():
+            source_type = 'image'
+            if 'jpeg' in detected_mime.lower() or 'jpg' in detected_mime.lower():
+                file_extension = 'jpg'
+            elif 'png' in detected_mime.lower():
+                file_extension = 'png'
+            elif 'gif' in detected_mime.lower():
+                file_extension = 'gif'
+            elif 'webp' in detected_mime.lower():
+                file_extension = 'webp'
+            else:
+                file_extension = 'jpg'  # default
+        else:
+            # Fallback: assume image
+            source_type = 'image'
+            file_extension = 'jpg'
+
+        print(f"→ Source type: {source_type}")
+        print(f"→ File extension: {file_extension}")
+
+        # Rename temporary file to proper extension
         if is_pdf:
             temp_file = os.path.join(temp_extract_dir, "input.pdf")
         else:
             temp_file = os.path.join(temp_extract_dir, f"input.{file_extension}")
 
-        with open(temp_file, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        os.rename(temp_raw_file, temp_file)
 
         print(f"→ File downloaded: {os.path.getsize(temp_file)} bytes")
 
