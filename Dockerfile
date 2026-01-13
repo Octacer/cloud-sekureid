@@ -6,14 +6,20 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive
 
-# Stage 1: Install all system dependencies (large layer - stays cached if not changed)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Build tools (needed for some pip packages)
+# Stage 1: Update package lists
+RUN apt-get update
+
+# Stage 2: Install build tools (stable, rarely changes)
+RUN apt-get install -y --no-install-recommends \
     build-essential \
-    # Chromium browser and driver
+    wget \
+    curl \
+    ca-certificates
+
+# Stage 3: Install Chromium and dependencies (large, stable layer)
+RUN apt-get install -y --no-install-recommends \
     chromium \
     chromium-driver \
-    # Essential dependencies for Chromium headless mode
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -32,20 +38,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
-    xdg-utils \
-    # PDF processing dependencies
-    poppler-utils \
-    # Tesseract OCR and dependencies
+    xdg-utils
+
+# Stage 4: Install PDF processing (medium, stable layer)
+RUN apt-get install -y --no-install-recommends \
+    poppler-utils
+
+# Stage 5: Install Tesseract OCR (medium, stable layer)
+RUN apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    tesseract-ocr-eng \
-    # File type detection
-    libmagic1 \
-    # Utilities
-    wget \
-    curl \
-    ca-certificates \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    tesseract-ocr-eng
+
+# Stage 6: Install other utilities (small, stable layer)
+RUN apt-get install -y --no-install-recommends \
+    libmagic1
+
+# Stage 7: Clean up apt cache (run once at the end)
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Create a non-root user (small layer - stays cached)
 RUN useradd -m -u 1000 appuser && \
