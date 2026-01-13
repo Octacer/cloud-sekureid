@@ -35,8 +35,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     poppler-utils \
     # Runtime libraries for Tesseract (from host)
     libtesseract5 \
-    libleptonica-dev \
-    libjpeg62-turbo \
+    liblept5 \
+    libjpeg-turbo8 \
+    libjpeg8 \
+    libpng16-16t64 \
+    libtiff6 \
+    libwebp7 \
+    libopenjp2-7 \
+    libgif7 \
+    zlib1g \
     # File type detection
     libmagic1 \
     # Utilities
