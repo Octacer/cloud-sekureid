@@ -1,6 +1,11 @@
 #!/bin/bash
+set -e
 
-cd repo
-git pull origin main
-docker build -t cloud-sekureid:latest .
-docker compose up
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cd "$SCRIPT_DIR/repo"
+sudo git pull
+docker build --no-cache -t cloud-sekureid:latest .
+cd "$SCRIPT_DIR"
+docker compose down
+docker compose up -d

@@ -131,6 +131,17 @@ async def cleanup_directory_after_delay(directory: str, delay: int = 3600):
         print(f"Error cleaning up directory {directory}: {e}")
 
 
+async def cleanup_file_after_delay(file_path: str, delay: int = 60):
+    """Background task to cleanup file after delay"""
+    await asyncio.sleep(delay)
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            print(f"Cleaned up file: {file_path}")
+    except Exception as e:
+        print(f"Error cleaning up file {file_path}: {e}")
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -712,8 +723,9 @@ async def extract_text(
     - JSON with extracted text, language detected, and extraction metadata
     """
     request_id = str(uuid.uuid4())
-    temp_extract_dir = os.path.join(os.getcwd(), "temp_extract", request_id)
-    os.makedirs(temp_extract_dir, exist_ok=True)
+    temp_dir = os.path.join(os.getcwd(), "temp_extract")
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_extract_dir = temp_dir
 
     try:
         print(f"\n{'='*80}")
@@ -729,7 +741,7 @@ async def extract_text(
         response.raise_for_status()
 
         # Save to temporary location first
-        temp_raw_file = os.path.join(temp_extract_dir, "temp_raw")
+        temp_raw_file = os.path.join(temp_extract_dir, f"{request_id}_raw")
         with open(temp_raw_file, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
@@ -769,11 +781,7 @@ async def extract_text(
         print(f"→ File extension: {file_extension}")
 
         # Rename temporary file to proper extension
-        if is_pdf:
-            temp_file = os.path.join(temp_extract_dir, "input.pdf")
-        else:
-            temp_file = os.path.join(temp_extract_dir, f"input.{file_extension}")
-
+        temp_file = os.path.join(temp_extract_dir, f"{request_id}.{file_extension}")
         os.rename(temp_raw_file, temp_file)
 
         print(f"→ File downloaded: {os.path.getsize(temp_file)} bytes")
@@ -815,8 +823,8 @@ async def extract_text(
         print(f"Request completed successfully")
         print(f"{'='*80}\n")
 
-        # Cleanup temp directory
-        background_tasks.add_task(cleanup_directory_after_delay, temp_extract_dir, 60)
+        # Cleanup temp file
+        background_tasks.add_task(cleanup_file_after_delay, temp_file, 60)
 
         return TextExtractionResponse(
             text=extracted_text,
