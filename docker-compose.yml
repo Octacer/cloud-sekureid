@@ -20,6 +20,12 @@ services:
       - ./sekureId_downloads:/home/appuser/downloads
       # Optional: Mount logs
       - ./sekureId_logs:/home/appuser/logs
+      # Mount Tesseract from host (read-only)
+      - /usr/bin/tesseract:/usr/bin/tesseract:ro
+      - /usr/share/tesseract-ocr:/usr/share/tesseract-ocr:ro
+      # Mount system libraries needed by Tesseract (read-only)
+      - /usr/lib/x86_64-linux-gnu/libtesseract.so.5:/usr/lib/x86_64-linux-gnu/libtesseract.so.5:ro
+      - /usr/lib/x86_64-linux-gnu/liblept.so.5:/usr/lib/x86_64-linux-gnu/liblept.so.5:ro
     restart: unless-stopped
     # Resource limits (adjust as needed)
     deploy:

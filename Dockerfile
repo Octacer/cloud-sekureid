@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies, Chromium, and ChromeDriver
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     # Chromium browser and driver
     chromium \
     chromium-driver \
@@ -33,13 +33,15 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     # PDF processing dependencies
     poppler-utils \
-    # OCR (Tesseract) dependencies
-    tesseract-ocr \
+    # Runtime libraries for Tesseract (from host)
+    libtesseract5 \
+    libleptonica-dev \
     # Utilities
     wget \
     curl \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser && \
@@ -52,9 +54,9 @@ WORKDIR /home/appuser/app
 # Copy requirements first for better caching
 COPY --chown=appuser:appuser requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with minimal cache
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    pip install --no-cache-dir --no-warn-script-location -r requirements.txt
 
 # Copy application files
 COPY --chown=appuser:appuser sekureid_automation.py .

@@ -260,6 +260,49 @@ Accept: application/json
 # Extracted at: {{extractedAt}}
 
 ###############################################################################
+# Text Extraction from Images/PDFs
+###############################################################################
+
+### Extract text from PDF
+# @name textExtractionPDF
+POST {{baseUrl}}/extract-text
+Content-Type: application/json
+
+{
+  "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+}
+
+###
+
+### Extract text from image
+# @name textExtractionImage
+POST {{baseUrl}}/extract-text
+Content-Type: application/json
+
+{
+  "url": "https://example.com/image.png"
+}
+
+###
+
+### Extract text and use request_id
+@extractionRequestId = {{textExtractionPDF.response.body.request_id}}
+@extractedText = {{textExtractionPDF.response.body.text}}
+
+# Extracted text length: Check response
+# Request ID: {{extractionRequestId}}
+
+###
+
+### Extract text from Octacer Stories PDF
+POST {{baseUrl}}/extract-text
+Content-Type: application/json
+
+{
+  "url": "https://stories.octacer.com/api/story/download/pdf/f16ce3da-17d7-48f7-858e-b5ee62f1ee1b"
+}
+
+###############################################################################
 # PDF to PNG Conversion
 ###############################################################################
 
@@ -341,7 +384,10 @@ GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
 #    - GET  /get-report-default-direct   → Direct Excel download
 #    - POST /generate-report-direct      → Direct Excel download
 #
-# 3. Vollna Integration:
+# 3. Text Extraction (OCR):
+#    - POST /extract-text                → Extract text from image/PDF via public URL
+#
+# 4. Vollna Integration:
 #    - GET  /get-vollna-cookies          → Extract cookies from Vollna after login
 #
 # JSON Response Format:
