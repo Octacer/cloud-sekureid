@@ -15,6 +15,8 @@ import uuid
 import asyncio
 import requests
 from pdf2image import convert_from_path
+from PIL import Image
+import pytesseract
 from sekureid_automation import SekureIDAutomation
 from vollna_automation import VollnaAutomation
 
@@ -74,6 +76,20 @@ class PdfToImageResponse(BaseModel):
     expires_in: int  # seconds
 
 
+class TextExtractionRequest(BaseModel):
+    url: HttpUrl  # Publicly accessible URL to image or PDF
+
+
+class TextExtractionResponse(BaseModel):
+    text: str
+    language: str
+    extraction_method: str
+    source_type: str  # 'image' or 'pdf'
+    total_pages: int  # For PDFs, number of pages processed
+    extracted_at: str
+    request_id: str
+
+
 # Store for tracking download files
 TEMP_DIR = os.path.join(os.getcwd(), "temp_reports")
 DOWNLOADS_DIR = os.path.join(os.getcwd(), "downloads")
@@ -127,6 +143,7 @@ async def root():
             "GET /get-report-default-direct": "Generate and directly download today's report",
             "GET /download/{file_id}": "Download a generated report by file ID",
             "POST /pdf-to-png": "Convert PDF to PNG images (provide public PDF URL)",
+            "POST /extract-text": "Extract text from image or PDF using OCR (provide public URL)",
             "GET /get-vollna-cookies": "Get cookies from Vollna website after login",
             "GET /debug": "List all debug sessions (when errors occur)",
             "GET /debug/{debug_id}": "Get debug files for a specific debug session",
@@ -676,6 +693,124 @@ async def pdf_to_png(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to convert PDF to PNG: {str(e)}"
+        )
+
+
+@app.post("/extract-text", response_model=TextExtractionResponse)
+async def extract_text(
+    request_data: TextExtractionRequest,
+    background_tasks: BackgroundTasks
+):
+    """
+    Extract text from an image or PDF using OCR (Tesseract)
+
+    Parameters:
+    - image_or_pdf_url: Publicly accessible URL to an image (JPG, PNG, etc.) or PDF file
+
+    Returns:
+    - JSON with extracted text, language detected, and extraction metadata
+    """
+    request_id = str(uuid.uuid4())
+    temp_extract_dir = os.path.join(os.getcwd(), "temp_extract", request_id)
+    os.makedirs(temp_extract_dir, exist_ok=True)
+
+    try:
+        print(f"\n{'='*80}")
+        print(f"Processing text extraction request: {request_id}")
+        print(f"{'='*80}")
+        print(f"→ URL: {request_data.url}")
+
+        url_str = str(request_data.url)
+        file_extension = url_str.split('.')[-1].lower().split('?')[0]  # Handle query params
+
+        # Determine if it's a PDF or image
+        is_pdf = file_extension in ['pdf']
+        source_type = "pdf" if is_pdf else "image"
+
+        print(f"→ Source type: {source_type}")
+        print(f"→ File extension: {file_extension}")
+
+        # Download file
+        print(f"→ Downloading file...")
+        response = requests.get(url_str, timeout=30, stream=True)
+        response.raise_for_status()
+
+        # Save file temporarily
+        if is_pdf:
+            temp_file = os.path.join(temp_extract_dir, "input.pdf")
+        else:
+            temp_file = os.path.join(temp_extract_dir, f"input.{file_extension}")
+
+        with open(temp_file, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        print(f"→ File downloaded: {os.path.getsize(temp_file)} bytes")
+
+        # Extract text
+        extracted_text = ""
+        total_pages = 0
+
+        if is_pdf:
+            print(f"→ Converting PDF to images for OCR...")
+            # Convert PDF to images
+            images = convert_from_path(temp_file, dpi=200)
+            total_pages = len(images)
+            print(f"→ PDF has {total_pages} pages")
+
+            # Extract text from each page
+            print(f"→ Extracting text from PDF pages...")
+            page_texts = []
+            for i, image in enumerate(images, start=1):
+                print(f"  → Processing page {i}/{total_pages}...")
+                page_text = pytesseract.image_to_string(image)
+                page_texts.append(f"--- PAGE {i} ---\n{page_text}")
+
+            extracted_text = "\n\n".join(page_texts)
+
+        else:
+            print(f"→ Extracting text from image...")
+            # Open image and extract text
+            image = Image.open(temp_file)
+            extracted_text = pytesseract.image_to_string(image)
+            total_pages = 1
+
+        print(f"→ Text extraction complete")
+        print(f"→ Extracted text length: {len(extracted_text)} characters")
+
+        extracted_at = datetime.now()
+
+        print(f"\n{'='*80}")
+        print(f"Request completed successfully")
+        print(f"{'='*80}\n")
+
+        # Cleanup temp directory
+        background_tasks.add_task(cleanup_directory_after_delay, temp_extract_dir, 60)
+
+        return TextExtractionResponse(
+            text=extracted_text,
+            language="eng",  # Tesseract default, can be extended for language detection
+            extraction_method="Tesseract OCR",
+            source_type=source_type,
+            total_pages=total_pages,
+            extracted_at=extracted_at.isoformat(),
+            request_id=request_id
+        )
+
+    except requests.RequestException as e:
+        shutil.rmtree(temp_extract_dir, ignore_errors=True)
+        print(f"Error downloading file: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to download file from URL: {str(e)}"
+        )
+
+    except Exception as e:
+        shutil.rmtree(temp_extract_dir, ignore_errors=True)
+        print(f"Error extracting text: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to extract text: {str(e)}"
         )
 
 

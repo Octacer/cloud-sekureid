@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     # PDF processing dependencies
     poppler-utils \
+    # OCR (Tesseract) dependencies
+    tesseract-ocr \
     # Utilities
     wget \
     curl \
