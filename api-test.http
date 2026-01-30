@@ -269,7 +269,7 @@ POST {{baseUrl}}/extract-text
 Content-Type: application/json
 
 {
-  "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
+  "url": "https://drive.google.com/uc?id=18jpRp2ROi6mvLuYWVRE0xcPC3NEKdcj9&export=download"
 }
 
 ###
