@@ -133,21 +133,54 @@ class GoogleSerpAutomation:
             page_source = self.driver.page_source
             soup = BeautifulSoup(page_source, 'lxml')
 
-            # Try multiple selectors to find result containers
+            # SEMANTIC APPROACH: Find containers by structure, not class names
+            # Google changes classes frequently, but the structure is more stable:
+            # - Each result has an h3 tag (title)
+            # - The h3 is near/inside an anchor (link)
+            # - The container usually has cite tags or snippets
+
             result_containers = []
 
-            # Strategy 1: div.g (most common)
-            result_containers = soup.select('div.g')
+            # Find the main search results container
+            search_container = soup.select_one('div#search, div#rso, div#center_col')
 
-            # Strategy 2: div with data-sokoban-container attribute
-            if not result_containers:
-                result_containers = soup.select('div[data-sokoban-container]')
+            if search_container:
+                # Find all divs that contain an h3 (organic results have titles in h3)
+                # This is semantic and stable across Google updates
+                all_h3_elements = search_container.find_all('h3')
 
-            # Strategy 3: Look for divs inside #search or #rso
-            if not result_containers:
-                search_div = soup.select_one('div#search, div#rso')
-                if search_div:
-                    result_containers = search_div.find_all('div', recursive=False)
+                print(f"Found {len(all_h3_elements)} h3 elements (potential results)")
+
+                # For each h3, find its closest parent div that looks like a result container
+                seen_containers = set()
+                for h3 in all_h3_elements:
+                    # Walk up the DOM tree to find a suitable container
+                    # A result container typically:
+                    # 1. Contains the h3
+                    # 2. Has an anchor tag with href
+                    # 3. Is not too deep (avoid nested containers)
+                    current = h3.parent
+                    depth = 0
+                    while current and depth < 10:  # Limit depth to avoid going too far up
+                        # Check if this div looks like a result container
+                        if current.name == 'div':
+                            # Make sure it has a link
+                            has_link = current.find('a', href=True) is not None
+
+                            # Avoid duplicate containers (use id if available, otherwise string representation)
+                            container_id = id(current)
+
+                            if has_link and container_id not in seen_containers:
+                                # Check if this container is not too large (avoid main containers)
+                                # A result container shouldn't contain other h3s
+                                h3_count = len(current.find_all('h3'))
+                                if h3_count == 1:  # Only this h3, not other results
+                                    result_containers.append(current)
+                                    seen_containers.add(container_id)
+                                    break
+
+                        current = current.parent
+                        depth += 1
 
             print(f"Found {len(result_containers)} potential result containers")
 
