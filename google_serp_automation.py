@@ -393,7 +393,8 @@ class GoogleSerpAutomation:
             return None
 
     def scrape_serp(self, query: str, page: int = 1,
-                    num_results: int = 10, language: str = "en", show_raw: bool = False) -> dict:
+                    num_results: int = 10, language: str = "en", show_raw: bool = False,
+                    capture: bool = False, debug_dir: str = None) -> dict:
         """
         Main method: Scrape Google SERP and return organic results
 
@@ -454,6 +455,34 @@ class GoogleSerpAutomation:
             total_results = self._extract_total_results()
             total_results_count = self._extract_total_results_count(total_results)
 
+            # Capture screenshot and page source if requested
+            screenshot_path = None
+            page_source_path = None
+            if capture and debug_dir:
+                print(f"→ Capturing screenshot and page source...")
+                try:
+                    import os
+                    from datetime import datetime
+
+                    # Create debug directory if it doesn't exist
+                    os.makedirs(debug_dir, exist_ok=True)
+
+                    # Save screenshot
+                    screenshot_filename = "serp_screenshot.png"
+                    screenshot_path = os.path.join(debug_dir, screenshot_filename)
+                    self.driver.save_screenshot(screenshot_path)
+                    print(f"  → Screenshot saved: {screenshot_filename}")
+
+                    # Save page source
+                    page_source_filename = "serp_page_source.html"
+                    page_source_path = os.path.join(debug_dir, page_source_filename)
+                    with open(page_source_path, "w", encoding="utf-8") as f:
+                        f.write(self.driver.page_source)
+                    print(f"  → Page source saved: {page_source_filename}")
+
+                except Exception as e:
+                    print(f"  → Error capturing screenshot/page source: {e}")
+
             result = {
                 'captcha_detected': False,
                 'organic_results': organic_results,
@@ -464,6 +493,11 @@ class GoogleSerpAutomation:
             # Add raw containers if requested
             if show_raw and raw_containers:
                 result['raw_containers'] = raw_containers
+
+            # Add screenshot paths if captured
+            if capture:
+                result['screenshot_path'] = screenshot_path
+                result['page_source_path'] = page_source_path
 
             return result
 

@@ -98,6 +98,7 @@ class GoogleSerpRequest(BaseModel):
     page: int = 1  # Page number (1-10)
     language: str = "en"  # Language code
     show_raw: bool = False  # Include raw HTML of result containers for debugging
+    capture: bool = False  # Capture screenshot of the search results page
 
 
 class OrganicResult(BaseModel):
@@ -127,6 +128,9 @@ class GoogleSerpResponse(BaseModel):
     request_id: str
     scraped_at: str  # ISO timestamp
     raw_containers: Optional[List[RawContainer]] = None  # Raw HTML when show_raw=true
+    screenshot_url: Optional[str] = None  # Screenshot URL when capture=true
+    page_source_url: Optional[str] = None  # Page source URL when capture=true
+    debug_id: Optional[str] = None  # Debug session ID when capture=true
 
 
 # Store for tracking download files
@@ -1087,6 +1091,15 @@ async def scrape_google_serp(
                 detail="page must be between 1 and 10"
             )
 
+        # Create debug directory if capture is enabled
+        debug_dir = None
+        debug_id = None
+        if request_data.capture:
+            debug_id = f"serp_{request_id[:8]}"
+            debug_dir = os.path.join("downloads", f"debug_{debug_id}")
+            os.makedirs(debug_dir, exist_ok=True)
+            print(f"→ Debug directory created: {debug_dir}")
+
         # Initialize automation
         print("→ Initializing Google SERP automation...")
         automation = GoogleSerpAutomation()
@@ -1098,7 +1111,9 @@ async def scrape_google_serp(
             page=request_data.page,
             num_results=request_data.num_results,
             language=request_data.language,
-            show_raw=request_data.show_raw
+            show_raw=request_data.show_raw,
+            capture=request_data.capture,
+            debug_dir=debug_dir
         )
 
         # Check for CAPTCHA (fail fast)
@@ -1125,6 +1140,15 @@ async def scrape_google_serp(
             import math
             total_pages = math.ceil(total_results_count / request_data.num_results)
 
+        # Build screenshot URLs if captured
+        screenshot_url = None
+        page_source_url = None
+        if request_data.capture and debug_id:
+            if serp_data.get("screenshot_path"):
+                screenshot_url = f"{BASE_DOMAIN}/files/debug_{debug_id}/serp_screenshot.png"
+            if serp_data.get("page_source_path"):
+                page_source_url = f"{BASE_DOMAIN}/files/debug_{debug_id}/serp_page_source.html"
+
         # Build response
         response = GoogleSerpResponse(
             query=request_data.query,
@@ -1136,7 +1160,10 @@ async def scrape_google_serp(
             results_count=len(serp_data.get("organic_results", [])),
             request_id=request_id,
             scraped_at=scraped_at.isoformat(),
-            raw_containers=serp_data.get("raw_containers") if request_data.show_raw else None
+            raw_containers=serp_data.get("raw_containers") if request_data.show_raw else None,
+            screenshot_url=screenshot_url,
+            page_source_url=page_source_url,
+            debug_id=debug_id
         )
 
         print(f"\n{'='*80}")
@@ -1147,6 +1174,10 @@ async def scrape_google_serp(
         print(f"→ Results found: {response.results_count}")
         print(f"→ Total results: {response.total_results}")
         print(f"→ Total pages: {response.total_pages}")
+        if request_data.capture and screenshot_url:
+            print(f"→ Screenshot: {screenshot_url}")
+            print(f"→ Page source: {page_source_url}")
+            print(f"→ Debug ID: {debug_id}")
         print(f"→ Response timestamp: {scraped_at.isoformat()}")
         print(f"{'='*80}\n")
 
