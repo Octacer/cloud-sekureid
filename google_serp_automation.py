@@ -155,24 +155,43 @@ class GoogleSerpAutomation:
             skipped = 0
             for idx, container in enumerate(result_containers):
                 container_parsed = False
+                skip_reason = None
+                has_h3 = False
+                has_url = False
+
                 try:
                     # Extract title - look for h3 tag
                     title_elem = container.find('h3')
                     if not title_elem:
                         skipped += 1
-                        print(f"  Container {idx+1}: Skipped - no h3 title found")
+                        skip_reason = "no h3 title found"
+                        print(f"  Container {idx+1}: Skipped - {skip_reason}")
                         if show_raw:
                             raw_containers.append({
                                 'index': idx + 1,
-                                'html': str(container)[:1000],  # Limit to 1000 chars
-                                'parsed': False
+                                'html': str(container)[:5000],  # Increased to 5000 chars
+                                'parsed': False,
+                                'skip_reason': skip_reason,
+                                'has_h3': False,
+                                'has_url': False
                             })
                         continue
 
+                    has_h3 = True
                     title = title_elem.get_text(strip=True)
                     if not title:
                         skipped += 1
-                        print(f"  Container {idx+1}: Skipped - empty title")
+                        skip_reason = "empty title"
+                        print(f"  Container {idx+1}: Skipped - {skip_reason}")
+                        if show_raw:
+                            raw_containers.append({
+                                'index': idx + 1,
+                                'html': str(container)[:5000],
+                                'parsed': False,
+                                'skip_reason': skip_reason,
+                                'has_h3': True,
+                                'has_url': False
+                            })
                         continue
 
                     # Extract URL - look for anchor tag in various places
@@ -209,14 +228,37 @@ class GoogleSerpAutomation:
                             url = link.get('href')
 
                     # Validate URL
+                    if url:
+                        has_url = True
+
                     if not url:
                         skipped += 1
-                        print(f"  Container {idx+1}: Skipped - no URL found (title: {title[:50]}...)")
+                        skip_reason = f"no URL found (title: {title[:50]}...)"
+                        print(f"  Container {idx+1}: Skipped - {skip_reason}")
+                        if show_raw:
+                            raw_containers.append({
+                                'index': idx + 1,
+                                'html': str(container)[:5000],
+                                'parsed': False,
+                                'skip_reason': skip_reason,
+                                'has_h3': True,
+                                'has_url': False
+                            })
                         continue
 
                     if url.startswith('/search') or url.startswith('#'):
                         skipped += 1
-                        print(f"  Container {idx+1}: Skipped - invalid URL: {url[:50]}")
+                        skip_reason = f"invalid URL: {url[:50]}"
+                        print(f"  Container {idx+1}: Skipped - {skip_reason}")
+                        if show_raw:
+                            raw_containers.append({
+                                'index': idx + 1,
+                                'html': str(container)[:5000],
+                                'parsed': False,
+                                'skip_reason': skip_reason,
+                                'has_h3': True,
+                                'has_url': True
+                            })
                         continue
 
                     # Extract display URL - look for cite tag
@@ -273,18 +315,25 @@ class GoogleSerpAutomation:
                     if show_raw:
                         raw_containers.append({
                             'index': idx + 1,
-                            'html': str(container)[:2000],  # Limit to 2000 chars
-                            'parsed': True
+                            'html': str(container)[:8000],  # Increased to 8000 chars
+                            'parsed': True,
+                            'skip_reason': None,
+                            'has_h3': True,
+                            'has_url': True
                         })
 
                 except Exception as e:
                     skipped += 1
-                    print(f"  Container {idx+1}: Error - {str(e)[:100]}")
+                    skip_reason = f"Error: {str(e)[:100]}"
+                    print(f"  Container {idx+1}: {skip_reason}")
                     if show_raw and not container_parsed:
                         raw_containers.append({
                             'index': idx + 1,
-                            'html': str(container)[:1000],
-                            'parsed': False
+                            'html': str(container)[:5000],
+                            'parsed': False,
+                            'skip_reason': skip_reason,
+                            'has_h3': has_h3,
+                            'has_url': has_url
                         })
                     continue
 

@@ -112,6 +112,9 @@ class RawContainer(BaseModel):
     index: int
     html: str
     parsed: bool  # Whether this container was successfully parsed
+    skip_reason: Optional[str] = None  # Why it was skipped (if not parsed)
+    has_h3: Optional[bool] = None  # Debug: Does it have h3 tag
+    has_url: Optional[bool] = None  # Debug: Does it have URL
 
 class GoogleSerpResponse(BaseModel):
     query: str
