@@ -97,6 +97,7 @@ class GoogleSerpRequest(BaseModel):
     num_results: int = 10  # Results per page: 10, 20, 30, 50, or 100
     page: int = 1  # Page number (1-10)
     language: str = "en"  # Language code
+    show_raw: bool = False  # Include raw HTML of result containers for debugging
 
 
 class OrganicResult(BaseModel):
@@ -107,14 +108,22 @@ class OrganicResult(BaseModel):
     snippet: str
 
 
+class RawContainer(BaseModel):
+    index: int
+    html: str
+    parsed: bool  # Whether this container was successfully parsed
+
 class GoogleSerpResponse(BaseModel):
     query: str
     page: int
     total_results: Optional[str]  # "About X results"
+    total_results_count: Optional[int]  # Numeric count extracted from total_results
+    total_pages: Optional[int]  # Estimated total pages (total_results_count / num_results)
     organic_results: List[OrganicResult]
     results_count: int  # Number of results returned
     request_id: str
     scraped_at: str  # ISO timestamp
+    raw_containers: Optional[List[RawContainer]] = None  # Raw HTML when show_raw=true
 
 
 # Store for tracking download files
@@ -1085,7 +1094,8 @@ async def scrape_google_serp(
             query=request_data.query,
             page=request_data.page,
             num_results=request_data.num_results,
-            language=request_data.language
+            language=request_data.language,
+            show_raw=request_data.show_raw
         )
 
         # Check for CAPTCHA (fail fast)
@@ -1105,15 +1115,25 @@ async def scrape_google_serp(
 
         scraped_at = datetime.now()
 
+        # Calculate total pages
+        total_results_count = serp_data.get("total_results_count")
+        total_pages = None
+        if total_results_count:
+            import math
+            total_pages = math.ceil(total_results_count / request_data.num_results)
+
         # Build response
         response = GoogleSerpResponse(
             query=request_data.query,
             page=request_data.page,
             total_results=serp_data.get("total_results"),
+            total_results_count=total_results_count,
+            total_pages=total_pages,
             organic_results=serp_data.get("organic_results", []),
             results_count=len(serp_data.get("organic_results", [])),
             request_id=request_id,
-            scraped_at=scraped_at.isoformat()
+            scraped_at=scraped_at.isoformat(),
+            raw_containers=serp_data.get("raw_containers") if request_data.show_raw else None
         )
 
         print(f"\n{'='*80}")
@@ -1123,6 +1143,7 @@ async def scrape_google_serp(
         print(f"→ Query: {request_data.query}")
         print(f"→ Results found: {response.results_count}")
         print(f"→ Total results: {response.total_results}")
+        print(f"→ Total pages: {response.total_pages}")
         print(f"→ Response timestamp: {scraped_at.isoformat()}")
         print(f"{'='*80}\n")
 

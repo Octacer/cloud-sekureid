@@ -118,9 +118,15 @@ class GoogleSerpAutomation:
             print(f"Error checking for CAPTCHA: {e}")
             return False
 
-    def _parse_organic_results(self) -> List[dict]:
-        """Extract organic search results from page"""
+    def _parse_organic_results(self, show_raw: bool = False) -> tuple:
+        """Extract organic search results from page
+
+        Returns:
+            tuple: (results: List[dict], raw_containers: List[dict]) if show_raw=True
+                   (results: List[dict], None) if show_raw=False
+        """
         results = []
+        raw_containers = [] if show_raw else None
 
         try:
             # Get page source and parse with BeautifulSoup
@@ -146,35 +152,71 @@ class GoogleSerpAutomation:
             print(f"Found {len(result_containers)} potential result containers")
 
             position = 1
-            for container in result_containers:
+            skipped = 0
+            for idx, container in enumerate(result_containers):
+                container_parsed = False
                 try:
                     # Extract title - look for h3 tag
                     title_elem = container.find('h3')
                     if not title_elem:
+                        skipped += 1
+                        print(f"  Container {idx+1}: Skipped - no h3 title found")
+                        if show_raw:
+                            raw_containers.append({
+                                'index': idx + 1,
+                                'html': str(container)[:1000],  # Limit to 1000 chars
+                                'parsed': False
+                            })
                         continue
 
                     title = title_elem.get_text(strip=True)
                     if not title:
+                        skipped += 1
+                        print(f"  Container {idx+1}: Skipped - empty title")
                         continue
 
                     # Extract URL - look for anchor tag in various places
                     url = None
                     display_url = None
 
-                    # Try to find URL in yuRUbf div
+                    # Strategy 1: Try to find URL in yuRUbf div
                     yuRUbf_div = container.find('div', class_='yuRUbf')
                     if yuRUbf_div:
                         link = yuRUbf_div.find('a')
                         if link and link.get('href'):
                             url = link.get('href')
 
-                    # Fallback: find any link with href
+                    # Strategy 2: Find link that's a parent/sibling of h3
+                    if not url:
+                        # Look for parent anchor
+                        parent_link = title_elem.find_parent('a', href=True)
+                        if parent_link:
+                            url = parent_link.get('href')
+
+                    # Strategy 3: Find any anchor near the title
+                    if not url:
+                        # Look for sibling or nearby anchor
+                        for sibling in container.find_all('a', href=True, limit=5):
+                            href = sibling.get('href')
+                            if href and not href.startswith('/search') and not href.startswith('#'):
+                                url = href
+                                break
+
+                    # Strategy 4: Find first valid anchor in container
                     if not url:
                         link = container.find('a', href=True)
                         if link:
                             url = link.get('href')
 
-                    if not url or url.startswith('/search'):
+                    # Validate URL
+                    if not url:
+                        skipped += 1
+                        print(f"  Container {idx+1}: Skipped - no URL found (title: {title[:50]}...)")
+                        continue
+
+                    if url.startswith('/search') or url.startswith('#'):
+                        skipped += 1
+                        print(f"  Container {idx+1}: Skipped - invalid URL: {url[:50]}")
                         continue
 
                     # Extract display URL - look for cite tag
@@ -223,19 +265,40 @@ class GoogleSerpAutomation:
 
                     results.append(result)
                     position += 1
+                    container_parsed = True
 
-                    print(f"→ Extracted result {position-1}: {title[:50]}...")
+                    print(f"  → Extracted result {position-1}: {title[:50]}...")
+
+                    # Save raw HTML if requested
+                    if show_raw:
+                        raw_containers.append({
+                            'index': idx + 1,
+                            'html': str(container)[:2000],  # Limit to 2000 chars
+                            'parsed': True
+                        })
 
                 except Exception as e:
-                    print(f"Error parsing individual result: {e}")
+                    skipped += 1
+                    print(f"  Container {idx+1}: Error - {str(e)[:100]}")
+                    if show_raw and not container_parsed:
+                        raw_containers.append({
+                            'index': idx + 1,
+                            'html': str(container)[:1000],
+                            'parsed': False
+                        })
                     continue
 
-            print(f"Successfully extracted {len(results)} organic results")
+            print(f"\nParsing summary:")
+            print(f"  → Total containers found: {len(result_containers)}")
+            print(f"  → Successfully extracted: {len(results)}")
+            print(f"  → Skipped: {skipped}")
+            if show_raw:
+                print(f"  → Raw containers captured: {len(raw_containers)}")
 
         except Exception as e:
             print(f"Error parsing organic results: {e}")
 
-        return results
+        return results, raw_containers
 
     def _extract_total_results(self) -> Optional[str]:
         """Extract total results count from page"""
@@ -258,8 +321,30 @@ class GoogleSerpAutomation:
             print(f"Error extracting total results: {e}")
             return None
 
+    def _extract_total_results_count(self, total_results_str: Optional[str]) -> Optional[int]:
+        """Extract numeric count from total results string"""
+        if not total_results_str:
+            return None
+
+        try:
+            import re
+            # Remove commas and extract digits
+            # Examples: "About 269 results" -> 269
+            #          "About 1,234,567 results" -> 1234567
+            numbers = re.findall(r'[\d,]+', total_results_str)
+            if numbers:
+                # Take the first number found and remove commas
+                count_str = numbers[0].replace(',', '')
+                return int(count_str)
+
+            return None
+
+        except Exception as e:
+            print(f"Error extracting numeric count: {e}")
+            return None
+
     def scrape_serp(self, query: str, page: int = 1,
-                    num_results: int = 10, language: str = "en") -> dict:
+                    num_results: int = 10, language: str = "en", show_raw: bool = False) -> dict:
         """
         Main method: Scrape Google SERP and return organic results
 
@@ -268,9 +353,10 @@ class GoogleSerpAutomation:
             page: Page number (1-based)
             num_results: Number of results per page (10, 20, 30, 50, 100)
             language: Language code (e.g., 'en', 'es')
+            show_raw: Include raw HTML of result containers for debugging
 
         Returns:
-            dict with 'organic_results', 'total_results', and 'captcha_detected'
+            dict with 'organic_results', 'total_results', 'total_results_count', 'captcha_detected', and optionally 'raw_containers'
         """
         try:
             # Setup driver
@@ -312,17 +398,25 @@ class GoogleSerpAutomation:
 
             # Parse organic results
             print(f"→ Parsing organic results...")
-            organic_results = self._parse_organic_results()
+            organic_results, raw_containers = self._parse_organic_results(show_raw=show_raw)
 
             # Extract total results count
             print(f"→ Extracting total results count...")
             total_results = self._extract_total_results()
+            total_results_count = self._extract_total_results_count(total_results)
 
-            return {
+            result = {
                 'captcha_detected': False,
                 'organic_results': organic_results,
-                'total_results': total_results
+                'total_results': total_results,
+                'total_results_count': total_results_count
             }
+
+            # Add raw containers if requested
+            if show_raw and raw_containers:
+                result['raw_containers'] = raw_containers
+
+            return result
 
         except Exception as e:
             print(f"Error in scrape_serp: {e}")
