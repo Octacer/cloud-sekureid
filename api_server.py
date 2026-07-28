@@ -11,6 +11,7 @@ from typing import Optional, Dict, List
 import os
 import shutil
 import subprocess
+import zipfile
 from datetime import datetime, timedelta
 import uuid
 import asyncio
@@ -816,12 +817,33 @@ async def extract_text(
             raise
 
         # Map MIME type to file extension
-        is_pdf = 'pdf' in detected_mime.lower()
+        mime_lower = detected_mime.lower()
+        is_pdf = 'pdf' in mime_lower
+
+        # Detect spreadsheets. magic often reports OOXML .xlsx as a bare
+        # application/zip, so when we see a zip we peek inside for the tell-tale
+        # xl/workbook.xml before deciding.
+        is_spreadsheet = (
+            'spreadsheet' in mime_lower
+            or 'excel' in mime_lower
+        )
+        if not is_spreadsheet and ('zip' in mime_lower or 'openxml' in mime_lower):
+            try:
+                with zipfile.ZipFile(temp_raw_file) as zf:
+                    names = zf.namelist()
+                is_spreadsheet = any(n.startswith('xl/workbook.xml') for n in names)
+            except Exception as zip_error:
+                print(f"[{request_id}] Zip inspection failed: {zip_error}")
+
         print(f"[{request_id}] Is PDF: {is_pdf}")
+        print(f"[{request_id}] Is spreadsheet: {is_spreadsheet}")
 
         if is_pdf:
             file_extension = 'pdf'
             source_type = 'pdf'
+        elif is_spreadsheet:
+            file_extension = 'xlsx'
+            source_type = 'spreadsheet'
         elif 'image' in detected_mime.lower():
             source_type = 'image'
             if 'jpeg' in detected_mime.lower() or 'jpg' in detected_mime.lower():
@@ -944,6 +966,54 @@ async def extract_text(
                 except Exception as pdf_error:
                     print(f"[{request_id}] ERROR processing PDF: {pdf_error}")
                     raise
+
+        elif is_spreadsheet:
+            print(f"[{request_id}] Processing spreadsheet file")
+            try:
+                import openpyxl
+
+                # First pass: formulas (data_only=False keeps the =SUM(...) strings).
+                wb = openpyxl.load_workbook(temp_file, data_only=False, read_only=True)
+                # Second pass: cached computed values, if the writer saved them.
+                try:
+                    wb_values = openpyxl.load_workbook(temp_file, data_only=True, read_only=True)
+                except Exception as values_error:
+                    print(f"[{request_id}] WARNING: values pass failed: {values_error}")
+                    wb_values = None
+
+                total_pages = len(wb.sheetnames)
+                print(f"[{request_id}] Workbook loaded, {total_pages} sheet(s)")
+
+                sheet_texts = []
+                for sheet_name in wb.sheetnames:
+                    ws = wb[sheet_name]
+                    ws_values = wb_values[sheet_name] if wb_values and sheet_name in wb_values.sheetnames else None
+                    print(f"[{request_id}] Sheet '{sheet_name}': {ws.max_row} rows x {ws.max_column} cols")
+
+                    lines = [f"--- SHEET: {sheet_name} ---"]
+                    for row in ws.iter_rows():
+                        for cell in row:
+                            if cell.value is None:
+                                continue
+                            entry = f"{cell.coordinate}: {cell.value}"
+                            # If the cell holds a formula, also surface its computed value.
+                            if ws_values is not None and isinstance(cell.value, str) and cell.value.startswith('='):
+                                computed = ws_values[cell.coordinate].value
+                                if computed is not None:
+                                    entry += f" => {computed}"
+                            lines.append(entry)
+                    sheet_texts.append("\n".join(lines))
+
+                wb.close()
+                if wb_values is not None:
+                    wb_values.close()
+
+                extracted_text = "\n\n".join(sheet_texts)
+                extraction_method = "openpyxl"
+                print(f"[{request_id}] Spreadsheet extraction complete")
+            except Exception as xlsx_error:
+                print(f"[{request_id}] ERROR processing spreadsheet: {xlsx_error}")
+                raise
 
         else:
             print(f"[{request_id}] Processing image file")
