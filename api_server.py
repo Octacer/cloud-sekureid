@@ -10,6 +10,7 @@ from pydantic import BaseModel, HttpUrl
 from typing import Optional, Dict, List
 import os
 import shutil
+import subprocess
 from datetime import datetime, timedelta
 import uuid
 import asyncio
@@ -857,38 +858,92 @@ async def extract_text(
         # Extract text
         extracted_text = ""
         total_pages = 0
+        extraction_method = "Tesseract OCR"
+
+        # Cap the number of pages we process so a huge PDF can't OCR forever.
+        MAX_PAGES = 50
+        # A page with real text yields far more than this; below it we assume the
+        # page is scanned/image-only and fall back to OCR.
+        NATIVE_CHARS_PER_PAGE_THRESHOLD = 40
 
         print(f"[{request_id}] Step 4: Text extraction")
 
         if is_pdf:
             print(f"[{request_id}] Processing PDF file")
-            print(f"[{request_id}] Converting PDF to images (DPI: 200)...")
+
+            # Determine page count cheaply via pdfinfo (poppler) so we can cap work
+            # and size the native-text threshold correctly.
+            page_count = 0
             try:
-                # Convert PDF to images
-                images = convert_from_path(temp_file, dpi=200)
-                total_pages = len(images)
-                print(f"[{request_id}] PDF conversion successful")
-                print(f"[{request_id}] Total pages: {total_pages}")
+                pdfinfo = subprocess.run(
+                    ['pdfinfo', temp_file],
+                    capture_output=True, text=True, timeout=30
+                )
+                for line in pdfinfo.stdout.splitlines():
+                    if line.startswith('Pages:'):
+                        page_count = int(line.split(':', 1)[1].strip())
+                        break
+            except Exception as info_error:
+                print(f"[{request_id}] WARNING: pdfinfo failed: {info_error}")
 
-                # Extract text from each page
-                print(f"[{request_id}] Extracting text from PDF pages...")
-                page_texts = []
-                for i, image in enumerate(images, start=1):
-                    print(f"[{request_id}] Processing page {i}/{total_pages}...")
-                    try:
-                        page_text = pytesseract.image_to_string(image)
-                        text_len = len(page_text.strip())
-                        print(f"[{request_id}] Page {i} extracted: {text_len} characters")
-                        page_texts.append(f"--- PAGE {i} ---\n{page_text}")
-                    except Exception as page_error:
-                        print(f"[{request_id}] ERROR extracting page {i}: {page_error}")
-                        page_texts.append(f"--- PAGE {i} ---\nERROR: {str(page_error)}")
+            capped_pages = min(page_count, MAX_PAGES) if page_count else MAX_PAGES
+            if page_count > MAX_PAGES:
+                print(f"[{request_id}] PDF has {page_count} pages; capping to {MAX_PAGES}")
 
-                extracted_text = "\n\n".join(page_texts)
-                print(f"[{request_id}] All pages processed")
-            except Exception as pdf_error:
-                print(f"[{request_id}] ERROR processing PDF: {pdf_error}")
-                raise
+            # Native-first: try pdftotext -layout (preserves columns/tables).
+            native_text = ""
+            print(f"[{request_id}] Attempting native extraction (pdftotext -layout)...")
+            try:
+                pdftotext_cmd = ['pdftotext', '-layout']
+                if page_count > MAX_PAGES:
+                    pdftotext_cmd += ['-l', str(MAX_PAGES)]
+                pdftotext_cmd += [temp_file, '-']
+                result = subprocess.run(
+                    pdftotext_cmd, capture_output=True, text=True, timeout=120
+                )
+                native_text = result.stdout or ""
+                print(f"[{request_id}] Native extraction: {len(native_text.strip())} characters")
+            except Exception as native_error:
+                print(f"[{request_id}] WARNING: pdftotext failed: {native_error}")
+
+            threshold = NATIVE_CHARS_PER_PAGE_THRESHOLD * max(capped_pages, 1)
+            if len(native_text.strip()) >= threshold:
+                # Text PDF — use the faithful native extraction.
+                extracted_text = native_text
+                total_pages = page_count or capped_pages
+                extraction_method = "pdftotext (native)"
+                print(f"[{request_id}] Using native extraction (>= threshold {threshold})")
+            else:
+                # Looks scanned/image-only — fall back to OCR.
+                print(f"[{request_id}] Native text below threshold {threshold}; falling back to OCR")
+                print(f"[{request_id}] Converting PDF to images (DPI: 200)...")
+                try:
+                    # Convert PDF to images (respecting the page cap)
+                    images = convert_from_path(temp_file, dpi=200, last_page=MAX_PAGES)
+                    total_pages = page_count or len(images)
+                    print(f"[{request_id}] PDF conversion successful")
+                    print(f"[{request_id}] Total pages: {total_pages}, OCR'ing {len(images)}")
+
+                    # Extract text from each page
+                    print(f"[{request_id}] Extracting text from PDF pages...")
+                    page_texts = []
+                    for i, image in enumerate(images, start=1):
+                        print(f"[{request_id}] Processing page {i}/{len(images)}...")
+                        try:
+                            page_text = pytesseract.image_to_string(image)
+                            text_len = len(page_text.strip())
+                            print(f"[{request_id}] Page {i} extracted: {text_len} characters")
+                            page_texts.append(f"--- PAGE {i} ---\n{page_text}")
+                        except Exception as page_error:
+                            print(f"[{request_id}] ERROR extracting page {i}: {page_error}")
+                            page_texts.append(f"--- PAGE {i} ---\nERROR: {str(page_error)}")
+
+                    extracted_text = "\n\n".join(page_texts)
+                    extraction_method = "Tesseract OCR (fallback)"
+                    print(f"[{request_id}] All pages processed")
+                except Exception as pdf_error:
+                    print(f"[{request_id}] ERROR processing PDF: {pdf_error}")
+                    raise
 
         else:
             print(f"[{request_id}] Processing image file")
@@ -930,7 +985,7 @@ async def extract_text(
         return TextExtractionResponse(
             text=extracted_text,
             language="eng",  # Tesseract default, can be extended for language detection
-            extraction_method="Tesseract OCR",
+            extraction_method=extraction_method,
             source_type=source_type,
             total_pages=total_pages,
             extracted_at=extracted_at.isoformat(),
