@@ -820,23 +820,31 @@ async def extract_text(
         mime_lower = detected_mime.lower()
         is_pdf = 'pdf' in mime_lower
 
-        # Detect spreadsheets. magic often reports OOXML .xlsx as a bare
-        # application/zip, so when we see a zip we peek inside for the tell-tale
-        # xl/workbook.xml before deciding.
-        is_spreadsheet = (
-            'spreadsheet' in mime_lower
-            or 'excel' in mime_lower
-        )
-        if not is_spreadsheet and ('zip' in mime_lower or 'openxml' in mime_lower):
+        # Detect Office OOXML documents. magic often reports .xlsx/.docx as a
+        # bare application/zip, so when we see a zip we peek inside for the
+        # tell-tale part (xl/workbook.xml for Excel, word/document.xml for Word).
+        is_spreadsheet = 'spreadsheet' in mime_lower or 'excel' in mime_lower
+        is_word = 'wordprocessing' in mime_lower or 'msword' in mime_lower
+        # magic is unreliable for OOXML — depending on the libmagic build a .docx
+        # or .xlsx can come back as application/zip, octet-stream, or CDFV2. So
+        # unless it's already clearly a PDF/image, peek inside: every OOXML file
+        # is a zip, and the marker part tells us which kind. Non-zip files raise
+        # BadZipFile and fall through unchanged.
+        is_image = 'image' in mime_lower
+        if not (is_pdf or is_image or is_spreadsheet or is_word):
             try:
                 with zipfile.ZipFile(temp_raw_file) as zf:
                     names = zf.namelist()
                 is_spreadsheet = any(n.startswith('xl/workbook.xml') for n in names)
+                is_word = any(n.startswith('word/document.xml') for n in names)
+            except zipfile.BadZipFile:
+                print(f"[{request_id}] Not a zip/OOXML container")
             except Exception as zip_error:
                 print(f"[{request_id}] Zip inspection failed: {zip_error}")
 
         print(f"[{request_id}] Is PDF: {is_pdf}")
         print(f"[{request_id}] Is spreadsheet: {is_spreadsheet}")
+        print(f"[{request_id}] Is word: {is_word}")
 
         if is_pdf:
             file_extension = 'pdf'
@@ -844,6 +852,9 @@ async def extract_text(
         elif is_spreadsheet:
             file_extension = 'xlsx'
             source_type = 'spreadsheet'
+        elif is_word:
+            file_extension = 'docx'
+            source_type = 'document'
         elif 'image' in detected_mime.lower():
             source_type = 'image'
             if 'jpeg' in detected_mime.lower() or 'jpg' in detected_mime.lower():
@@ -1013,6 +1024,37 @@ async def extract_text(
                 print(f"[{request_id}] Spreadsheet extraction complete")
             except Exception as xlsx_error:
                 print(f"[{request_id}] ERROR processing spreadsheet: {xlsx_error}")
+                raise
+
+        elif is_word:
+            print(f"[{request_id}] Processing Word document")
+            try:
+                import docx
+
+                document = docx.Document(temp_file)
+                parts = []
+
+                # Body paragraphs, in document order.
+                for para in document.paragraphs:
+                    if para.text.strip():
+                        parts.append(para.text)
+
+                # Tables — emit each row as tab-separated cells so tabular data
+                # (niches, scores, rankings) stays grader-readable.
+                for t_index, table in enumerate(document.tables, start=1):
+                    parts.append(f"--- TABLE {t_index} ---")
+                    for row in table.rows:
+                        cells = [cell.text.strip() for cell in row.cells]
+                        parts.append("\t".join(cells))
+
+                extracted_text = "\n".join(parts)
+                # A .docx has no fixed page count until rendered; report 1.
+                total_pages = 1
+                extraction_method = "python-docx"
+                print(f"[{request_id}] Word extraction complete: "
+                      f"{len(document.paragraphs)} paragraphs, {len(document.tables)} table(s)")
+            except Exception as docx_error:
+                print(f"[{request_id}] ERROR processing Word document: {docx_error}")
                 raise
 
         else:
