@@ -50,8 +50,13 @@ RUN apt-get install -y --no-install-recommends \
     tesseract-ocr-eng
 
 # Stage 6: Install other utilities (small, stable layer)
+# - libmagic1: file-type detection for /extract-text
+# - ffmpeg: audio/video decoding for /transcribe (broad container support)
+# - libgomp1: OpenMP runtime required by ctranslate2 (faster-whisper backend)
 RUN apt-get install -y --no-install-recommends \
-    libmagic1
+    libmagic1 \
+    ffmpeg \
+    libgomp1
 
 # Stage 7: Clean up apt cache (run once at the end)
 RUN apt-get clean && \
@@ -74,6 +79,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
 
 # Copy application files (small layers - change frequently)
 COPY --chown=appuser:appuser api_server.py .
+COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser sekureid_automation.py .
 COPY --chown=appuser:appuser vollna_automation.py .
 COPY --chown=appuser:appuser google_serp_automation.py .

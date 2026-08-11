@@ -1,4 +1,4 @@
-### Sekure-ID Report Generator API - Testing File
+### Octacer Internal Tooling Platform - Testing File
 ### Use with VS Code REST Client extension or IntelliJ HTTP Client
 ### Change the @baseUrl variable to your server URL
 
@@ -303,6 +303,48 @@ Content-Type: application/json
 }
 
 ###############################################################################
+# Audio / Video Transcription (Whisper)
+###############################################################################
+
+### Transcribe audio (auto-detect language, with timestamps)
+# @name transcribeAudio
+POST {{baseUrl}}/transcribe
+Content-Type: application/json
+
+{
+  "url": "https://example.com/meeting.mp3"
+}
+
+###
+
+### Transcribe video, force English, no per-segment timestamps
+POST {{baseUrl}}/transcribe
+Content-Type: application/json
+
+{
+  "url": "https://example.com/clip.mp4",
+  "language": "en",
+  "include_segments": false
+}
+
+###
+
+### Translate non-English audio to English text
+POST {{baseUrl}}/transcribe
+Content-Type: application/json
+
+{
+  "url": "https://example.com/arabic-audio.m4a",
+  "task": "translate"
+}
+
+###
+
+### Extract transcript and request_id from response
+@transcript = {{transcribeAudio.response.body.text}}
+@transcriptRequestId = {{transcribeAudio.response.body.request_id}}
+
+###############################################################################
 # PDF to PNG Conversion
 ###############################################################################
 
@@ -384,11 +426,15 @@ GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
 #    - GET  /get-report-default-direct   → Direct Excel download
 #    - POST /generate-report-direct      → Direct Excel download
 #
-# 3. Text Extraction (OCR):
-#    - POST /extract-text                → Extract text from image/PDF via public URL
+# 3. Document & Media Utilities:
+#    - POST /extract-text                → Extract text from image/PDF/spreadsheet/Word (public URL)
+#    - POST /pdf-to-png                  → Convert a PDF to PNG images (public URL)
+#    - POST /resize-image                → Resize / convert an image (public URL)
+#    - POST /transcribe                  → Transcribe an audio/video file to text (public URL)
 #
-# 4. Vollna Integration:
+# 4. Web Automation:
 #    - GET  /get-vollna-cookies          → Extract cookies from Vollna after login
+#    - POST /scrape-google-serp          → Scrape Google search results for a query
 #
 # JSON Response Format:
 # {

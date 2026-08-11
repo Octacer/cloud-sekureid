@@ -1,0 +1,1303 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Octacer Internal Tooling Platform",
+    "description": "Octacer's internal tooling platform — a single API bundling attendance report generation, document & text extraction (OCR), image processing, audio/video transcription, and web automation.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/generate-report": {
+      "post": {
+        "summary": "Generate Report",
+        "description": "Generate attendance report and return JSON with download URL\n\nParameters:\n- company_code: Company code for login (default: 85)\n- username: Username for login (default: hisham.octacer)\n- password: Password for login\n- report_date: Date for report in YYYY-MM-DD format (default: today)\n\nReturns:\n- JSON with report_url (download link), file_id, and metadata",
+        "operationId": "generate_report_generate_report_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate-report-direct": {
+      "post": {
+        "summary": "Generate Report Direct",
+        "description": "Generate attendance report and directly return Excel file\n\nParameters:\n- company_code: Company code for login (default: 85)\n- username: Username for login (default: hisham.octacer)\n- password: Password for login\n- report_date: Date for report in YYYY-MM-DD format (default: today)\n\nReturns:\n- Excel file with attendance report (direct download)",
+        "operationId": "generate_report_direct_generate_report_direct_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-report-default": {
+      "get": {
+        "summary": "Get Report Default",
+        "description": "Generate today's report with default credentials - Returns JSON with download URL\n\nThis is a convenience endpoint that generates today's report using default credentials.\nSimply call: GET /get-report-default\n\nReturns:\n- JSON with report_url (download link), file_id, and metadata",
+        "operationId": "get_report_default_get_report_default_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-report-default-direct": {
+      "get": {
+        "summary": "Get Report Default Direct",
+        "description": "Generate today's report with default credentials - Direct file download\n\nReturns:\n- Excel file with attendance report for today (direct download)",
+        "operationId": "get_report_default_direct_get_report_default_direct_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download/{file_id}": {
+      "get": {
+        "summary": "Download File",
+        "description": "Download a generated report by file ID\n\nParameters:\n- file_id: The unique file ID returned from generate-report endpoint\n\nReturns:\n- Excel file download",
+        "operationId": "download_file_download__file_id__get",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/{debug_id}": {
+      "get": {
+        "summary": "Get Debug Info",
+        "description": "Get debug information and list of debug files for a specific debug ID\n\nParameters:\n- debug_id: The debug ID returned in error response\n\nReturns:\n- JSON with list of available debug files and download URLs",
+        "operationId": "get_debug_info_debug__debug_id__get",
+        "parameters": [
+          {
+            "name": "debug_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Debug Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug": {
+      "get": {
+        "summary": "List Debug Sessions",
+        "description": "List all available debug sessions\n\nReturns:\n- JSON with list of all debug sessions available",
+        "operationId": "list_debug_sessions_debug_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pdf-to-png": {
+      "post": {
+        "summary": "Pdf To Png",
+        "description": "Convert PDF to PNG images\n\nParameters:\n- pdf_url: Publicly accessible URL to the PDF file\n\nReturns:\n- JSON with list of PNG image URLs, one per page",
+        "operationId": "pdf_to_png_pdf_to_png_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PdfToImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PdfToImageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract-text": {
+      "post": {
+        "summary": "Extract Text",
+        "description": "Extract text from an image, PDF, spreadsheet, or Word document.\n\nParameters:\n- url: Publicly accessible URL to the file\n\nReturns:\n- JSON with extracted text, language detected, and extraction metadata",
+        "operationId": "extract_text_extract_text_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextExtractionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TextExtractionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/resize-image": {
+      "post": {
+        "summary": "Resize Image",
+        "description": "Resize and/or convert an image.\n\nAccepts common raster formats (PNG, JPG/JPEG, WEBP, GIF, BMP, TIFF, and\nHEIC/HEIF when pillow-heif is installed) and returns a URL to the converted\nimage.\n\nParameters:\n- url: Publicly accessible URL to the source image\n- width / height: Target dimensions in pixels (either or both, optional)\n- mode: 'fit' (keep aspect ratio within the box, default) or 'exact'\n- output_format: jpeg | jpg | png | webp (default: jpeg)\n- quality: Encoder quality 1-100 for lossy formats (default: 90)",
+        "operationId": "resize_image_resize_image_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageResizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageResizeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-vollna-cookies": {
+      "get": {
+        "summary": "Get Vollna Cookies",
+        "description": "Get cookies from Vollna website after login\n\nParameters:\n- email: Email for login (default: mateo@brightdock.com)\n- password: Password for login (default: Antonia.12)\n- final_url: Final URL to navigate to after login (default: https://www.vollna.com/dashboard/filter/22703)\n\nReturns:\n- JSON with cookies as a string, cookie count, and extraction timestamp",
+        "operationId": "get_vollna_cookies_get_vollna_cookies_get",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "mateo@brightdock.com",
+              "title": "Email"
+            }
+          },
+          {
+            "name": "password",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Antonia.12",
+              "title": "Password"
+            }
+          },
+          {
+            "name": "final_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "https://www.vollna.com/dashboard/filter/22703",
+              "title": "Final Url"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VollnaCookiesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scrape-google-serp": {
+      "post": {
+        "summary": "Scrape Google Serp",
+        "description": "Scrape Google Search Engine Results Page (SERP)\n\nReturns organic search results for a given query\n\n**Parameters:**\n- **query**: Search query string (required)\n- **num_results**: Number of results per page - must be 10, 20, 30, 50, or 100 (default: 10)\n- **page**: Page number between 1 and 10 (default: 1)\n- **language**: Language code like 'en', 'es', 'fr' (default: 'en')\n\n**Returns:**\n- JSON with organic search results including position, title, URL, and snippet\n- CAPTCHA detection will return HTTP 429 error\n\n**Note:** Web scraping Google may violate their Terms of Service.\nThis is for educational/research purposes only.",
+        "operationId": "scrape_google_serp_scrape_google_serp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSerpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoogleSerpResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transcribe": {
+      "post": {
+        "summary": "Transcribe",
+        "description": "Transcribe an audio or video file to text using Whisper (faster-whisper).\n\nParameters:\n- **url**: Publicly accessible URL to an audio or video file\n  (mp3, wav, m4a, ogg, flac, mp4, mov, webm, ...). Audio is extracted\n  automatically from video containers.\n- **language**: ISO code like 'en', 'es', 'ar' to force a language; omit to\n  auto-detect.\n- **task**: 'transcribe' (keep original language) or 'translate' (to English).\n- **include_segments**: include per-segment timestamps (default: true).\n\nReturns:\n- JSON with the full transcript, detected language, duration, and optional\n  timestamped segments.",
+        "operationId": "transcribe_transcribe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriptionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Root endpoint with API information",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GoogleSerpRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "num_results": {
+            "type": "integer",
+            "title": "Num Results",
+            "default": 10
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "default": 1
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "show_raw": {
+            "type": "boolean",
+            "title": "Show Raw",
+            "default": false
+          },
+          "capture": {
+            "type": "boolean",
+            "title": "Capture",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "GoogleSerpRequest"
+      },
+      "GoogleSerpResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "total_results": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Results"
+          },
+          "total_results_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Results Count"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Pages"
+          },
+          "organic_results": {
+            "items": {
+              "$ref": "#/components/schemas/OrganicResult"
+            },
+            "type": "array",
+            "title": "Organic Results"
+          },
+          "results_count": {
+            "type": "integer",
+            "title": "Results Count"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "scraped_at": {
+            "type": "string",
+            "title": "Scraped At"
+          },
+          "raw_containers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RawContainer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Containers"
+          },
+          "screenshot_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screenshot Url"
+          },
+          "page_source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Source Url"
+          },
+          "debug_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debug Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "page",
+          "total_results",
+          "total_results_count",
+          "total_pages",
+          "organic_results",
+          "results_count",
+          "request_id",
+          "scraped_at"
+        ],
+        "title": "GoogleSerpResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImageInfo": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "url",
+          "filename"
+        ],
+        "title": "ImageInfo"
+      },
+      "ImageResizeRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "fit"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format",
+            "default": "jpeg"
+          },
+          "quality": {
+            "type": "integer",
+            "title": "Quality",
+            "default": 90
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "ImageResizeRequest"
+      },
+      "ImageResizeResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "source_format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Format"
+          },
+          "output_format": {
+            "type": "string",
+            "title": "Output Format"
+          },
+          "original_width": {
+            "type": "integer",
+            "title": "Original Width"
+          },
+          "original_height": {
+            "type": "integer",
+            "title": "Original Height"
+          },
+          "new_width": {
+            "type": "integer",
+            "title": "New Width"
+          },
+          "new_height": {
+            "type": "integer",
+            "title": "New Height"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "filename",
+          "source_format",
+          "output_format",
+          "original_width",
+          "original_height",
+          "new_width",
+          "new_height",
+          "size_bytes",
+          "mode",
+          "request_id",
+          "generated_at",
+          "expires_in"
+        ],
+        "title": "ImageResizeResponse"
+      },
+      "OrganicResult": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "display_url": {
+            "type": "string",
+            "title": "Display Url"
+          },
+          "snippet": {
+            "type": "string",
+            "title": "Snippet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "position",
+          "title",
+          "url",
+          "display_url",
+          "snippet"
+        ],
+        "title": "OrganicResult"
+      },
+      "PdfToImageRequest": {
+        "properties": {
+          "pdf_url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Pdf Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pdf_url"
+        ],
+        "title": "PdfToImageRequest"
+      },
+      "PdfToImageResponse": {
+        "properties": {
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageInfo"
+            },
+            "type": "array",
+            "title": "Images"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "conversion_id": {
+            "type": "string",
+            "title": "Conversion Id"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "images",
+          "total_pages",
+          "conversion_id",
+          "generated_at",
+          "expires_in"
+        ],
+        "title": "PdfToImageResponse"
+      },
+      "RawContainer": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "html": {
+            "type": "string",
+            "title": "Html"
+          },
+          "parsed": {
+            "type": "boolean",
+            "title": "Parsed"
+          },
+          "skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skip Reason"
+          },
+          "has_h3": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has H3"
+          },
+          "has_url": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "html",
+          "parsed"
+        ],
+        "title": "RawContainer"
+      },
+      "ReportRequest": {
+        "properties": {
+          "company_code": {
+            "type": "string",
+            "title": "Company Code",
+            "default": "85"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": "hisham.octacer"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "default": "P@ss1234"
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date"
+          }
+        },
+        "type": "object",
+        "title": "ReportRequest"
+      },
+      "ReportResponse": {
+        "properties": {
+          "report_url": {
+            "type": "string",
+            "title": "Report Url"
+          },
+          "file_id": {
+            "type": "string",
+            "title": "File Id"
+          },
+          "report_date": {
+            "type": "string",
+            "title": "Report Date"
+          },
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "report_url",
+          "file_id",
+          "report_date",
+          "generated_at",
+          "expires_in"
+        ],
+        "title": "ReportResponse"
+      },
+      "TextExtractionRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "TextExtractionRequest"
+      },
+      "TextExtractionResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "extraction_method": {
+            "type": "string",
+            "title": "Extraction Method"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "extracted_at": {
+            "type": "string",
+            "title": "Extracted At"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "language",
+          "extraction_method",
+          "source_type",
+          "total_pages",
+          "extracted_at",
+          "request_id"
+        ],
+        "title": "TextExtractionResponse"
+      },
+      "TranscriptionRequest": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Url"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task",
+            "default": "transcribe"
+          },
+          "include_segments": {
+            "type": "boolean",
+            "title": "Include Segments",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "TranscriptionRequest"
+      },
+      "TranscriptionResponse": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "language_probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Probability"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TranscriptionSegment"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "transcribed_at": {
+            "type": "string",
+            "title": "Transcribed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "language",
+          "language_probability",
+          "duration",
+          "task",
+          "model",
+          "segments",
+          "request_id",
+          "transcribed_at"
+        ],
+        "title": "TranscriptionResponse"
+      },
+      "TranscriptionSegment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "start": {
+            "type": "number",
+            "title": "Start"
+          },
+          "end": {
+            "type": "number",
+            "title": "End"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start",
+          "end",
+          "text"
+        ],
+        "title": "TranscriptionSegment"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VollnaCookiesResponse": {
+        "properties": {
+          "cookies": {
+            "type": "string",
+            "title": "Cookies"
+          },
+          "cookie_count": {
+            "type": "integer",
+            "title": "Cookie Count"
+          },
+          "extracted_at": {
+            "type": "string",
+            "title": "Extracted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cookies",
+          "cookie_count",
+          "extracted_at"
+        ],
+        "title": "VollnaCookiesResponse"
+      }
+    }
+  }
+}

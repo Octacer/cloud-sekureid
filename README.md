@@ -1,6 +1,8 @@
-# Sekure-ID Cloud Report Generator
+# Octacer Internal Tooling Platform
 
-**Automate your daily attendance reports - Get Excel files instantly without logging in manually!**
+**A single API bundling Octacer's internal automation tools — attendance reports, document & text extraction (OCR), image processing, audio/video transcription, and web automation.**
+
+> Originally the Sekure-ID report generator, now the home for Octacer's internal service utilities.
 
 ## What Is This?
 
