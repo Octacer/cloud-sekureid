@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from src.config import TEMP_DIR, DOWNLOADS_DIR
 from src.routers import (
     reports, debug, pdf, extract, images, vollna, serp, transcribe,
-    audio, subtitles, analyze,
+    audio, subtitles, analyze, markdown_pdf,
 )
 
 app = FastAPI(
@@ -44,6 +44,7 @@ app.include_router(transcribe.router)
 app.include_router(audio.router)
 app.include_router(subtitles.router)
 app.include_router(analyze.router)
+app.include_router(markdown_pdf.router)
 
 
 @app.get("/")
@@ -59,6 +60,7 @@ async def root():
             "GET /get-report-default-direct": "Generate and directly download today's report",
             "GET /download/{file_id}": "Download a generated report by file ID",
             "POST /pdf-to-png": "Convert PDF to PNG images (provide public PDF URL)",
+            "POST /markdown-to-pdf": "Convert Markdown (text or URL) to a styled PDF, with optional branding & watermark",
             "POST /extract-text": "Extract text from image/PDF/spreadsheet/Word (provide public URL)",
             "POST /extract-text-file": "Extract text from an uploaded file (multipart) — image/PDF/spreadsheet/Word, no URL needed",
             "POST /resize-image": "Resize and/or convert an image (PNG/JPG/HEIC/WEBP → JPEG/PNG/WEBP)",

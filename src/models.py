@@ -25,6 +25,43 @@ class PdfToImageRequest(BaseModel):
     pdf_url: HttpUrl  # Publicly accessible PDF URL
 
 
+class MarkdownToPdfRequest(BaseModel):
+    # --- Input (provide exactly one) -------------------------------------
+    markdown: Optional[str] = None          # Raw markdown text
+    markdown_url: Optional[HttpUrl] = None  # Public URL to a .md file to fetch
+
+    # --- Document options ------------------------------------------------
+    title: Optional[str] = None             # Document title (header + PDF metadata + filename)
+    page_size: str = "A4"                   # A4 | Letter | Legal
+    orientation: str = "portrait"           # portrait | landscape
+    filename: Optional[str] = None          # Desired output filename (without needing .pdf)
+
+    # --- Branding (applied only when branding=True) ----------------------
+    branding: bool = True                   # Master toggle: header, footer, brand colors
+    company_name: str = "Octacer"           # Wordmark shown in the header
+    logo_url: Optional[HttpUrl] = None      # Optional logo image for the header (falls back to wordmark)
+    brand_color: str = "#0B5CAD"            # Accent colour for headings, links, rules, table headers
+    footer_text: Optional[str] = None       # Extra text on the left of the footer (default: company_name)
+    show_page_numbers: bool = True          # 'Page X of Y' on the right of the footer
+
+    # --- Watermark (independent of branding; off unless set) -------------
+    watermark: Optional[str] = None         # Faint diagonal watermark text, e.g. 'CONFIDENTIAL'
+
+
+class MarkdownToPdfResponse(BaseModel):
+    url: str                                # URL to the generated PDF
+    filename: str
+    branding: bool                          # Whether branded chrome was applied
+    watermarked: bool                       # Whether a watermark was rendered
+    page_size: str                          # 'A4' | 'Letter' | 'Legal'
+    orientation: str                        # 'portrait' | 'landscape'
+    total_pages: Optional[int]              # Page count (None if it could not be determined)
+    size_bytes: int
+    request_id: str
+    generated_at: str                       # ISO timestamp
+    expires_in: int                         # seconds
+
+
 class VollnaCookiesRequest(BaseModel):
     email: str
     password: str
