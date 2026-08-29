@@ -481,6 +481,68 @@ Content-Type: application/json
 }
 
 ###############################################################################
+# Markdown to PDF Conversion
+###############################################################################
+
+### Branded PDF from raw markdown text (header + footer + brand colours)
+# @name markdownBranded
+POST {{baseUrl}}/markdown-to-pdf
+Content-Type: application/json
+
+{
+  "markdown": "# Quarterly Report\n\nSome **bold** text and a [link](https://octacer.com).\n\n## Metrics\n\n| Metric | Value |\n|--------|-------|\n| Uptime | 99.9% |\n\n> Generated via /markdown-to-pdf.",
+  "title": "Quarterly Report",
+  "branding": true,
+  "company_name": "Octacer",
+  "footer_text": "Octacer Internal — Confidential"
+}
+
+###
+
+### Open the generated PDF from the previous response
+@markdownPdfUrl = {{markdownBranded.response.body.url}}
+GET {{markdownPdfUrl}}
+
+###
+
+### Branded PDF with a header logo and a CONFIDENTIAL watermark
+POST {{baseUrl}}/markdown-to-pdf
+Content-Type: application/json
+
+{
+  "markdown": "# Security Assessment\n\nInternal findings summary.\n\n## Scope\n\n- Item one\n- Item two",
+  "title": "Security Assessment",
+  "logo_url": "https://example.com/logo.png",
+  "brand_color": "#0B5CAD",
+  "watermark": "CONFIDENTIAL"
+}
+
+###
+
+### Plain PDF (no branding), Letter size, landscape
+POST {{baseUrl}}/markdown-to-pdf
+Content-Type: application/json
+
+{
+  "markdown": "# Plain Document\n\nNo header, footer, or brand colours — just clean content.",
+  "branding": false,
+  "page_size": "Letter",
+  "orientation": "landscape"
+}
+
+###
+
+### Convert markdown fetched from a public URL
+POST {{baseUrl}}/markdown-to-pdf
+Content-Type: application/json
+
+{
+  "markdown_url": "https://raw.githubusercontent.com/octocat/Hello-World/master/README",
+  "title": "Fetched Document",
+  "branding": true
+}
+
+###############################################################################
 # Debug Endpoints (When Errors Occur)
 ###############################################################################
 
@@ -524,6 +586,7 @@ GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
 # 3. Document & Media Utilities:
 #    - POST /extract-text                → Extract text from image/PDF/spreadsheet/Word (public URL)
 #    - POST /pdf-to-png                  → Convert a PDF to PNG images (public URL)
+#    - POST /markdown-to-pdf             → Convert Markdown (text or URL) to a styled/branded PDF
 #    - POST /resize-image                → Resize / convert an image (public URL)
 #    - POST /transcribe                  → Transcribe an audio/video file to text (public URL)
 #    - POST /extract-audio               → Extract the audio track from a video (public URL)
