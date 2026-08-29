@@ -54,6 +54,7 @@ async def root():
             "GET /download/{file_id}": "Download a generated report by file ID",
             "POST /pdf-to-png": "Convert PDF to PNG images (provide public PDF URL)",
             "POST /extract-text": "Extract text from image/PDF/spreadsheet/Word (provide public URL)",
+            "POST /extract-text-file": "Extract text from an uploaded file (multipart) — image/PDF/spreadsheet/Word, no URL needed",
             "POST /resize-image": "Resize and/or convert an image (PNG/JPG/HEIC/WEBP → JPEG/PNG/WEBP)",
             "GET /get-vollna-cookies": "Get cookies from Vollna website after login",
             "POST /scrape-google-serp": "Scrape Google search results for a query",
