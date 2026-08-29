@@ -345,6 +345,101 @@ Content-Type: application/json
 @transcriptRequestId = {{transcribeAudio.response.body.request_id}}
 
 ###############################################################################
+# Extract Audio from Video (ffmpeg)
+###############################################################################
+
+### Extract audio track from a video as MP3
+# @name extractAudio
+POST {{baseUrl}}/extract-audio
+Content-Type: application/json
+
+{
+  "url": "https://example.com/clip.mp4"
+}
+
+###
+
+### Extract audio as 16kHz mono WAV (ideal for downstream ASR/diarization)
+POST {{baseUrl}}/extract-audio
+Content-Type: application/json
+
+{
+  "url": "https://example.com/clip.mp4",
+  "output_format": "wav",
+  "sample_rate": 16000,
+  "mono": true
+}
+
+###
+
+### Download the extracted audio from the previous response
+@audioUrl = {{extractAudio.response.body.url}}
+GET {{audioUrl}}
+
+###############################################################################
+# Generate Subtitles (SRT / VTT)
+###############################################################################
+
+### Generate an SRT subtitle file from a video (auto-detect language)
+# @name generateSubtitles
+POST {{baseUrl}}/generate-subtitles
+Content-Type: application/json
+
+{
+  "url": "https://example.com/clip.mp4"
+}
+
+###
+
+### Generate both SRT and VTT, translating to English
+POST {{baseUrl}}/generate-subtitles
+Content-Type: application/json
+
+{
+  "url": "https://example.com/arabic-clip.mp4",
+  "task": "translate",
+  "format": "both"
+}
+
+###
+
+### Download the generated SRT from the previous response
+@srtUrl = {{generateSubtitles.response.body.srt_url}}
+GET {{srtUrl}}
+
+###############################################################################
+# Analyze Media (Gemini: diarization + language ID)
+###############################################################################
+# Requires GEMINI_API_KEY to be set on the server.
+
+### Transcribe with speaker diarization + auto language detection
+# @name analyzeMedia
+POST {{baseUrl}}/analyze-media
+Content-Type: application/json
+
+{
+  "url": "https://example.com/meeting.mp4"
+}
+
+###
+
+### Constrain to specific languages and skip the SRT file
+POST {{baseUrl}}/analyze-media
+Content-Type: application/json
+
+{
+  "url": "https://example.com/bilingual-call.mp3",
+  "language_codes": ["en", "ar"],
+  "generate_srt": false
+}
+
+###
+
+### Download the diarized SRT from the previous named response
+@diarizedSrt = {{analyzeMedia.response.body.srt_url}}
+GET {{diarizedSrt}}
+
+###############################################################################
 # PDF to PNG Conversion
 ###############################################################################
 
@@ -431,6 +526,9 @@ GET {{baseUrl}}/files/debug_abc-123-def-456/error_page_source.html
 #    - POST /pdf-to-png                  → Convert a PDF to PNG images (public URL)
 #    - POST /resize-image                → Resize / convert an image (public URL)
 #    - POST /transcribe                  → Transcribe an audio/video file to text (public URL)
+#    - POST /extract-audio               → Extract the audio track from a video (public URL)
+#    - POST /generate-subtitles          → Generate SRT/VTT subtitles from audio/video (public URL)
+#    - POST /analyze-media               → Diarized + language-aware transcript via Gemini (public URL)
 #
 # 4. Web Automation:
 #    - GET  /get-vollna-cookies          → Extract cookies from Vollna after login

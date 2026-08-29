@@ -3,7 +3,6 @@
 import os
 import uuid
 import asyncio
-import threading
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -11,6 +10,7 @@ import requests
 
 from src.config import TRANSCRIBE_TEMP_DIR
 from src.helpers import download_url_to_file, cleanup_file
+from src.whisper_engine import WHISPER_MODEL_SIZE, VALID_TASKS, run_transcription
 from src.models import (
     TranscriptionRequest,
     TranscriptionResponse,
@@ -18,69 +18,6 @@ from src.models import (
 )
 
 router = APIRouter()
-
-# faster-whisper is heavy (ctranslate2 + downloaded model weights), so the model
-# size / device / precision are read from the environment. This lets the same
-# image run a tiny model on a small box or a larger one where accuracy matters,
-# without any code change.
-WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
-WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
-# int8 is the fastest/lightest on CPU; use float16 on a GPU.
-WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-
-VALID_TASKS = ("transcribe", "translate")
-
-# The model is expensive to construct and downloads weights on first use, so it
-# is built once (lazily) and reused across requests. The lock guards that
-# first-time construction against concurrent requests racing to build it.
-_model = None
-_model_lock = threading.Lock()
-
-
-def _get_model():
-    """Lazily construct and cache the WhisperModel singleton."""
-    global _model
-    if _model is None:
-        with _model_lock:
-            if _model is None:
-                # Imported here so importing this router (and the whole app)
-                # doesn't pull in ctranslate2 until transcription is first used.
-                from faster_whisper import WhisperModel
-
-                print(
-                    f"Loading Whisper model '{WHISPER_MODEL_SIZE}' "
-                    f"(device={WHISPER_DEVICE}, compute_type={WHISPER_COMPUTE_TYPE})..."
-                )
-                _model = WhisperModel(
-                    WHISPER_MODEL_SIZE,
-                    device=WHISPER_DEVICE,
-                    compute_type=WHISPER_COMPUTE_TYPE,
-                )
-                print("Whisper model loaded")
-    return _model
-
-
-def _run_transcription(media_path: str, language, task: str):
-    """
-    Blocking transcription — executed in a worker thread via asyncio.to_thread.
-
-    faster-whisper returns a lazy generator of segments; the actual decoding
-    happens as it is consumed, so it is materialized here (inside the worker
-    thread) rather than back on the event loop.
-    """
-    model = _get_model()
-    segments_gen, info = model.transcribe(
-        media_path,
-        language=language,   # None → auto-detect
-        task=task,
-        beam_size=5,
-        vad_filter=True,     # skip long silences → faster, cleaner output
-    )
-    segments = [
-        {"id": i, "start": s.start, "end": s.end, "text": s.text.strip()}
-        for i, s in enumerate(segments_gen)
-    ]
-    return segments, info
 
 
 @router.post("/transcribe", response_model=TranscriptionResponse)
@@ -132,7 +69,7 @@ async def transcribe(
             f"(task={task}, language={request_data.language or 'auto'})..."
         )
         segments, info = await asyncio.to_thread(
-            _run_transcription, media_path, request_data.language, task
+            run_transcription, media_path, request_data.language, task
         )
 
         full_text = " ".join(seg["text"] for seg in segments).strip()

@@ -2,7 +2,7 @@
 Pydantic request/response models for the Sekure-ID API.
 """
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field, ConfigDict
 from typing import Optional, List
 
 
@@ -114,6 +114,92 @@ class TranscriptionResponse(BaseModel):
     segments: Optional[List[TranscriptionSegment]]  # Present when include_segments=true
     request_id: str
     transcribed_at: str  # ISO timestamp
+
+
+class AudioExtractionRequest(BaseModel):
+    url: HttpUrl  # Publicly accessible URL to a video or audio file
+    output_format: str = "mp3"  # mp3 | wav | m4a | ogg | flac
+    sample_rate: Optional[int] = None  # Target sample rate in Hz (e.g. 16000); None = keep source
+    mono: bool = False  # Downmix to a single channel
+
+
+class AudioExtractionResponse(BaseModel):
+    url: str  # URL to the extracted audio file
+    filename: str
+    output_format: str  # Format actually written (e.g. 'mp3')
+    sample_rate: Optional[int]  # Requested sample rate, if any
+    channels: Optional[int]  # 1 when mono was requested, else None (source channels kept)
+    duration: Optional[float]  # Audio duration in seconds (via ffprobe), if available
+    size_bytes: int
+    request_id: str
+    generated_at: str
+    expires_in: int  # seconds
+
+
+class SubtitleRequest(BaseModel):
+    url: HttpUrl  # Publicly accessible URL to an audio or video file
+    language: Optional[str] = None  # ISO code (e.g. 'en', 'ar'); None = auto-detect
+    task: str = "transcribe"  # 'transcribe' (keep language) or 'translate' (to English)
+    format: str = "srt"  # 'srt', 'vtt', or 'both'
+    include_segments: bool = True  # Include per-segment timestamps in the JSON response
+
+
+class SubtitleResponse(BaseModel):
+    srt_url: Optional[str]  # URL to the .srt file (when format is 'srt' or 'both')
+    vtt_url: Optional[str]  # URL to the .vtt file (when format is 'vtt' or 'both')
+    format: str  # 'srt', 'vtt', or 'both'
+    text: str  # Full transcript
+    language: str  # Detected (or forced) language code
+    language_probability: Optional[float]  # Confidence when auto-detected
+    duration: Optional[float]  # Duration of audio processed, in seconds
+    task: str  # 'transcribe' or 'translate'
+    model: str  # Whisper model size used
+    segment_count: int  # Number of subtitle cues
+    segments: Optional[List[TranscriptionSegment]]  # Present when include_segments=true
+    request_id: str
+    generated_at: str  # ISO timestamp
+    expires_in: int  # seconds
+
+
+class AnalyzeMediaRequest(BaseModel):
+    url: HttpUrl  # Publicly accessible URL to an audio or video file
+    language_codes: Optional[List[str]] = None  # Constrain to these ISO/BCP-47 codes; None = auto-detect
+    include_segments: bool = True  # Include per-segment detail in the response
+    generate_srt: bool = True  # Also render a speaker/language-labelled .srt file
+
+
+class AnalyzeSegment(BaseModel):
+    start: float  # Segment start time in seconds
+    end: float  # Segment end time in seconds
+    speaker: str  # Diarized speaker label, e.g. 'Speaker 1'
+    language: str  # Detected language (ISO 639-1), e.g. 'en', 'ar', or 'unknown'
+    text: str
+
+
+class MediaShift(BaseModel):
+    # 'from' is a Python keyword, so the field is named from_ and aliased to
+    # 'from' for both input (compute_shifts emits 'from') and output.
+    model_config = ConfigDict(populate_by_name=True)
+
+    at: float  # Time of the shift in seconds (segment boundary)
+    type: str  # 'speaker' or 'language'
+    from_: str = Field(alias="from")  # Previous speaker/language
+    to: str  # New speaker/language
+
+
+class AnalyzeMediaResponse(BaseModel):
+    languages_detected: List[str]  # All languages detected across the media
+    speakers_detected: List[str]  # All speaker labels detected
+    segments: Optional[List[AnalyzeSegment]]  # Present when include_segments=true
+    shifts: List[MediaShift]  # Speaker/language change points
+    transcript_text: str  # Full transcript (all segments joined)
+    srt_url: Optional[str]  # URL to the speaker/language-labelled .srt (when generate_srt=true)
+    source_type: str  # 'audio' or 'video'
+    duration: Optional[float]  # Audio duration in seconds, if available
+    model: str  # Gemini model used
+    request_id: str
+    generated_at: str  # ISO timestamp
+    expires_in: int  # seconds
 
 
 class GoogleSerpRequest(BaseModel):

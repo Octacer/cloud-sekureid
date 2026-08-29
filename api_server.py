@@ -14,7 +14,10 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from src.config import TEMP_DIR, DOWNLOADS_DIR
-from src.routers import reports, debug, pdf, extract, images, vollna, serp, transcribe
+from src.routers import (
+    reports, debug, pdf, extract, images, vollna, serp, transcribe,
+    audio, subtitles, analyze,
+)
 
 app = FastAPI(
     title="Octacer Internal Tooling Platform",
@@ -38,6 +41,9 @@ app.include_router(images.router)
 app.include_router(vollna.router)
 app.include_router(serp.router)
 app.include_router(transcribe.router)
+app.include_router(audio.router)
+app.include_router(subtitles.router)
+app.include_router(analyze.router)
 
 
 @app.get("/")
@@ -59,6 +65,9 @@ async def root():
             "GET /get-vollna-cookies": "Get cookies from Vollna website after login",
             "POST /scrape-google-serp": "Scrape Google search results for a query",
             "POST /transcribe": "Transcribe an audio/video file to text (provide public URL)",
+            "POST /extract-audio": "Extract the audio track from a video as mp3/wav/m4a (provide public URL)",
+            "POST /generate-subtitles": "Transcribe an audio/video file to SRT/VTT subtitle files (provide public URL)",
+            "POST /analyze-media": "Transcribe audio/video with speaker diarization + language ID via Gemini (provide public URL)",
             "GET /debug": "List all debug sessions (when errors occur)",
             "GET /debug/{debug_id}": "Get debug files for a specific debug session",
             "GET /health": "Health check endpoint"

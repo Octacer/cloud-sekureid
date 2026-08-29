@@ -72,6 +72,7 @@ curl http://localhost:8000/health
 Looking for more detailed information? Check the documentation folder:
 
 - **[TECHNICAL_README.md](docs/TECHNICAL_README.md)** - Complete technical documentation with API details and troubleshooting
+- **[VIDEO_INTELLIGENCE_ROADMAP.md](docs/VIDEO_INTELLIGENCE_ROADMAP.md)** - Video → audio/text/subtitles/speaker pipeline: what's shipped and what's next
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - How to deploy on Ubuntu servers
 - **[QUICK_SETUP_GUIDE.md](docs/QUICK_SETUP_GUIDE.md)** - Fast setup for existing servers
 - **[TESSERACT_SETUP.md](docs/TESSERACT_SETUP.md)** - OCR text extraction setup
