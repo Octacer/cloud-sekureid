@@ -60,7 +60,7 @@ class SekureIDAutomation:
     def login(self, company_code="85", username="hisham.octacer", password="P@ss1234"):
         """Login to the Sekure-ID portal"""
         print("\nNavigating to login page...")
-        self.driver.get("https://cloud.sekure-id.com/")
+        self.driver.get("http://46.62.128.122:9098/")
         print(f"→ Current URL: {self.driver.current_url}\n")
 
         # Wait for the form to be present
@@ -101,7 +101,7 @@ class SekureIDAutomation:
     def navigate_to_reports(self):
         """Navigate to Daily Reports page"""
         print("Navigating to Daily Reports...")
-        self.driver.get("https://cloud.sekure-id.com/DailyReports")
+        self.driver.get("http://46.62.128.122:9098/DailyReports")
         print(f"→ Current URL: {self.driver.current_url}")
         time.sleep(2)
         print(f"→ Page title: {self.driver.title}\n")
