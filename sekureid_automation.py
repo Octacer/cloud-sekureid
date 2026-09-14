@@ -31,12 +31,21 @@ class SekureIDAutomation:
         """Setup Chrome/Chromium driver with options"""
         chrome_options = Options()
 
-        # Download preferences
+        # Download preferences.
+        #
+        # Safe Browsing is off deliberately. The report host is plain HTTP, and
+        # Chrome holds downloads from insecure origins in a "Keep / Discard"
+        # state until a human confirms them. Headless on the server there is
+        # nobody to confirm, so the export stayed a .crdownload until the wait
+        # timed out - which is what broke attendance sync when the host moved
+        # from https://cloud.sekure-id.com to http://46.62.128.122:9098.
         prefs = {
             "download.default_directory": self.download_dir,
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "safebrowsing.enabled": True
+            "safebrowsing.enabled": False,
+            "safebrowsing_for_trusted_sources_enabled": False,
+            "download_restrictions": 0,
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
@@ -53,9 +62,24 @@ class SekureIDAutomation:
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # Avoid detection
         chrome_options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
+        # Same reason as the prefs above: stop Chrome quarantining the export
+        # behind a confirmation prompt that nobody is there to answer.
+        chrome_options.add_argument("--safebrowsing-disable-download-protection")
+        chrome_options.add_argument("--unsafely-treat-insecure-origin-as-secure=http://46.62.128.122:9098")
+
         # Initialize the driver
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.set_page_load_timeout(30)
+
+        # Belt and braces: declare the download directory over DevTools too, so
+        # it does not rely on prefs alone in headless Chrome.
+        try:
+            self.driver.execute_cdp_cmd("Page.setDownloadBehavior", {
+                "behavior": "allow",
+                "downloadPath": self.download_dir,
+            })
+        except Exception as e:
+            print(f"→ Could not set CDP download behaviour: {e}")
 
     def login(self, company_code="85", username="hisham.octacer", password="P@ss1234"):
         """Login to the Sekure-ID portal"""
