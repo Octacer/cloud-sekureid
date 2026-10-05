@@ -67,6 +67,10 @@ class SekureIDAutomation:
         chrome_options.add_argument("--safebrowsing-disable-download-protection")
         chrome_options.add_argument("--unsafely-treat-insecure-origin-as-secure=http://46.62.128.122:9098")
 
+        # View Report opens the viewer with window.open() from an AJAX callback,
+        # which is not a user gesture, so headless Chrome blocks it as a popup.
+        chrome_options.add_argument("--disable-popup-blocking")
+
         # Initialize the driver
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.set_page_load_timeout(30)
@@ -211,7 +215,11 @@ class SekureIDAutomation:
             view_report_button = wait.until(
                 EC.element_to_be_clickable((By.ID, "ViewReport"))
             )
-            view_report_button.click()
+            # Click through JavaScript, not WebDriver. The button sits in the
+            # footer below the employee checkbox list: a native click is either
+            # intercepted by the list or, in headless, silently lands nowhere
+            # and the page never sees a click event.
+            self.driver.execute_script("arguments[0].click();", view_report_button)
             print(f"→ Clicked ViewReport button (ID: ViewReport)\n")
 
         except Exception as e:
@@ -229,9 +237,13 @@ class SekureIDAutomation:
         print(f"→ Initial window handles: {len(self.driver.window_handles)}")
         print(f"→ Current URL: {self.driver.current_url}\n")
 
-        # Wait for new tab to open
-        print("→ Waiting 3 seconds for new tab to open...")
-        time.sleep(3)
+        # Wait for the viewer tab, which only opens once the LoadReportData
+        # AJAX call returns
+        print("→ Waiting up to 20 seconds for new tab to open...")
+        try:
+            WebDriverWait(self.driver, 20).until(lambda d: len(d.window_handles) > 1)
+        except TimeoutException:
+            pass
 
         # Switch to the new tab (report viewer)
         if len(self.driver.window_handles) > 1:
@@ -240,7 +252,10 @@ class SekureIDAutomation:
             self.driver.switch_to.window(self.driver.window_handles[-1])
             print(f"→ Switched to new tab\n")
         else:
-            print(f"→ No new tab opened, staying on current window\n")
+            # The report data is held in the server session by then, so the
+            # viewer can be opened directly in this tab.
+            print(f"→ No new tab opened, opening report viewer directly\n")
+            self.driver.get("http://46.62.128.122:9098/Reports/ReportViewer.aspx")
 
         # Get current URL for debugging
         current_url = self.driver.current_url
